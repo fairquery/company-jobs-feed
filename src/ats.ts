@@ -1,0 +1,525 @@
+import { countriesFromText, countryToIso2 } from './gazetteer.js';
+import type { AtsClient } from './http.js';
+import { compact, htmlToText, textSaysRemote, toIso, uniq } from './normalize.js';
+import {
+    type Ats,
+    ATS_API_HOSTS,
+    type Compensation,
+    MAX_DESCRIPTION_CHARS,
+    type NormalizedJob,
+    SR_PAGE_SIZE,
+} from './types.js';
+
+export const SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+
+export function isValidSlug(s: string): boolean {
+    return SLUG_RE.test(s) && !s.includes('..');
+}
+
+const enc = encodeURIComponent;
+const base = (ats: Ats) => `https://${ATS_API_HOSTS[ats]}`;
+
+export function listUrl(ats: Ats, slug: string, opts: { offset?: number; limit?: number } = {}): string {
+    switch (ats) {
+        case 'greenhouse':
+            return `${base(ats)}/v1/boards/${enc(slug)}/jobs?content=true`;
+        case 'lever':
+            return `${base(ats)}/v0/postings/${enc(slug)}?mode=json${opts.limit ? `&limit=${opts.limit}` : ''}`;
+        case 'ashby':
+            return `${base(ats)}/posting-api/job-board/${enc(slug)}?includeCompensation=true`;
+        case 'smartrecruiters':
+            return `${base(ats)}/v1/companies/${enc(slug)}/postings?limit=${opts.limit ?? SR_PAGE_SIZE}&offset=${opts.offset ?? 0}`;
+        default:
+            throw new Error(`unknown ATS ${String(ats)}`);
+    }
+}
+
+/** Documented per-job endpoint used by confirmOpen:"detail". Ashby has no documented per-job endpoint. */
+export function detailUrl(ats: Ats, slug: string, id: string): string | null {
+    switch (ats) {
+        case 'greenhouse':
+            return `${base(ats)}/v1/boards/${enc(slug)}/jobs/${enc(id)}`;
+        case 'lever':
+            return `${base(ats)}/v0/postings/${enc(slug)}/${enc(id)}?mode=json`;
+        case 'smartrecruiters':
+            return `${base(ats)}/v1/companies/${enc(slug)}/postings/${enc(id)}`;
+        default:
+            return null;
+    }
+}
+
+export interface BoardFetch {
+    company: string | null;
+    jobs: NormalizedJob[];
+    total: number;
+    complete: boolean;
+    sourceUrl: string;
+    requests: number;
+    notFound: boolean;
+}
+
+export interface FetchOpts {
+    maxJobs: number;
+    withDescription: boolean;
+    companyHint?: string;
+    shouldStop?: () => boolean;
+}
+
+function clip(s: string | null): string | null {
+    if (!s) return null;
+    return s.length > MAX_DESCRIPTION_CHARS ? `${s.slice(0, MAX_DESCRIPTION_CHARS)}…` : s;
+}
+
+function str(v: unknown): string | null {
+    if (typeof v === 'string') {
+        const t = v.trim();
+        return t || null;
+    }
+    if (typeof v === 'number') return String(v);
+    return null;
+}
+
+function splitLocations(s: string | null): string[] {
+    if (!s) return [];
+    return uniq(
+        s
+            .split(/\s*;\s*|\s+\|\s+|\s+or\s+/i)
+            .map((x) => x.trim())
+            .filter(Boolean),
+    );
+}
+
+function remoteFromText(locations: string[], title: string): { remote: boolean | null; basis: 'text' | null } {
+    if (!locations.length && !title) return { remote: null, basis: null };
+    return { remote: textSaysRemote(...locations, title), basis: 'text' };
+}
+
+function withCountries(job: Omit<NormalizedJob, 'countries' | 'country_basis'>, ats: string[]): NormalizedJob {
+    const atsCodes = uniq(compact(ats.map((c) => countryToIso2(c))));
+    if (atsCodes.length) return { ...job, countries: atsCodes, country_basis: 'ats' };
+    const txt = countriesFromText(job.locations);
+    return { ...job, countries: txt, country_basis: txt.length ? 'text' : null };
+}
+
+function workplace(wt: string, remoteFallback: boolean | null): NormalizedJob['workplace_type'] {
+    if (wt === 'remote' || wt === 'hybrid' || wt === 'onsite') return wt;
+    return remoteFallback ? 'remote' : null;
+}
+
+function srWorkplace(l: { remote?: boolean; hybrid?: boolean }): string {
+    if (l.remote) return 'remote';
+    if (l.hybrid) return 'hybrid';
+    if (l.remote === false) return 'onsite';
+    return '';
+}
+
+// ---------------- Greenhouse ----------------
+interface GhJob {
+    id: number | string;
+    title: string;
+    absolute_url?: string;
+    location?: { name?: string };
+    updated_at?: string;
+    first_published?: string;
+    company_name?: string;
+    content?: string;
+    departments?: { name?: string }[];
+    offices?: { name?: string; location?: string | null }[];
+    metadata?: { name?: string; value?: unknown }[] | null;
+}
+
+export function mapGreenhouse(slug: string, j: GhJob, company: string, withDescription: boolean): NormalizedJob {
+    const locations = splitLocations(str(j.location?.name));
+    const title = (j.title ?? '').trim();
+    const r = remoteFromText(locations, title);
+    const meta = Array.isArray(j.metadata) ? j.metadata : [];
+    const empType = meta.find((m) => /employment|job type|work type/i.test(m.name ?? ''));
+    return withCountries(
+        {
+            ats: 'greenhouse',
+            board: slug,
+            company: str(j.company_name) ?? company,
+            job_id: String(j.id),
+            title,
+            department: str(j.departments?.[0]?.name),
+            team: str(j.departments?.[1]?.name),
+            locations,
+            remote: r.remote,
+            remote_basis: r.basis,
+            workplace_type: r.remote ? 'remote' : null,
+            employment_type: empType ? str(empType.value) : null,
+            compensation: null,
+            posted_at: toIso(j.first_published),
+            ats_updated_at: toIso(j.updated_at),
+            apply_url: str(j.absolute_url),
+            job_url: str(j.absolute_url),
+            description_text: withDescription ? clip(htmlToText(j.content)) : null,
+            detail_url: detailUrl('greenhouse', slug, String(j.id)),
+        },
+        [],
+    );
+}
+
+// ---------------- Lever ----------------
+interface LeverJob {
+    id: string;
+    text: string;
+    hostedUrl?: string;
+    applyUrl?: string;
+    createdAt?: number;
+    updatedAt?: number;
+    country?: string | null;
+    workplaceType?: string;
+    categories?: {
+        commitment?: string;
+        department?: string;
+        location?: string;
+        team?: string;
+        allLocations?: string[];
+    };
+    descriptionPlain?: string;
+    lists?: { text?: string; content?: string }[];
+    additionalPlain?: string;
+    salaryRange?: { min?: number; max?: number; currency?: string; interval?: string } | null;
+    salaryDescriptionPlain?: string;
+}
+
+export function mapLever(slug: string, j: LeverJob, company: string, withDescription: boolean): NormalizedJob {
+    const c = j.categories ?? {};
+    const locations = uniq(compact([...(c.allLocations ?? []), c.location ?? null]));
+    const title = (j.text ?? '').trim();
+    const wt = (j.workplaceType ?? '').toLowerCase();
+    let remote: boolean | null;
+    let basis: 'ats' | 'text' | null;
+    if (wt === 'remote' || wt === 'onsite' || wt === 'hybrid') {
+        remote = wt === 'remote';
+        basis = 'ats';
+    } else ({ remote, basis } = remoteFromText(locations, title));
+    const sr = j.salaryRange;
+    const compensation: Compensation | null =
+        sr && (sr.min || sr.max)
+            ? {
+                  summary: str(j.salaryDescriptionPlain),
+                  min: sr.min ?? null,
+                  max: sr.max ?? null,
+                  currency: sr.currency ?? null,
+                  interval: sr.interval ?? null,
+              }
+            : null;
+    let description: string | null = null;
+    if (withDescription) {
+        const parts = [j.descriptionPlain ?? ''];
+        for (const l of j.lists ?? []) parts.push(`${l.text ?? ''}\n${htmlToText(l.content) ?? ''}`);
+        parts.push(j.additionalPlain ?? '');
+        description = clip(
+            parts
+                .map((p) => p.trim())
+                .filter(Boolean)
+                .join('\n\n') || null,
+        );
+    }
+    return withCountries(
+        {
+            ats: 'lever',
+            board: slug,
+            company,
+            job_id: j.id,
+            title,
+            department: str(c.department),
+            team: str(c.team),
+            locations,
+            remote,
+            remote_basis: basis,
+            workplace_type: workplace(wt, remote),
+            employment_type: str(c.commitment),
+            compensation,
+            posted_at: toIso(j.createdAt),
+            ats_updated_at: toIso(j.updatedAt),
+            apply_url: str(j.applyUrl) ?? str(j.hostedUrl),
+            job_url: str(j.hostedUrl),
+            description_text: description,
+            detail_url: detailUrl('lever', slug, j.id),
+        },
+        compact([j.country ?? null]),
+    );
+}
+
+// ---------------- Ashby ----------------
+interface AshbyAddress {
+    postalAddress?: { addressCountry?: string; addressLocality?: string; addressRegion?: string };
+}
+interface AshbyJob {
+    id: string;
+    title: string;
+    department?: string;
+    team?: string;
+    employmentType?: string;
+    location?: string;
+    secondaryLocations?: { location?: string; address?: AshbyAddress | AshbyAddress['postalAddress'] }[];
+    publishedAt?: string;
+    isListed?: boolean;
+    isRemote?: boolean | null;
+    workplaceType?: string | null;
+    address?: AshbyAddress;
+    jobUrl?: string;
+    applyUrl?: string;
+    descriptionPlain?: string;
+    compensation?: {
+        compensationTierSummary?: string | null;
+        scrapeableCompensationSalarySummary?: string | null;
+        summaryComponents?: {
+            compensationType?: string;
+            interval?: string;
+            currencyCode?: string | null;
+            minValue?: number | null;
+            maxValue?: number | null;
+        }[];
+    };
+}
+
+const EMPLOYMENT: Record<string, string> = {
+    FullTime: 'Full-time',
+    PartTime: 'Part-time',
+    Intern: 'Internship',
+    Contract: 'Contract',
+    Temporary: 'Temporary',
+};
+
+export function mapAshby(slug: string, j: AshbyJob, company: string, withDescription: boolean): NormalizedJob {
+    const locations = uniq(compact([str(j.location), ...(j.secondaryLocations ?? []).map((s) => str(s.location))]));
+    const countryNames = compact([
+        j.address?.postalAddress?.addressCountry ?? null,
+        ...(j.secondaryLocations ?? []).map((s) => {
+            const a = s.address as AshbyAddress & { addressCountry?: string };
+            return a?.postalAddress?.addressCountry ?? a?.addressCountry ?? null;
+        }),
+    ]);
+    const wt = (j.workplaceType ?? '').toLowerCase();
+    const title = (j.title ?? '').trim();
+    let remote: boolean | null = typeof j.isRemote === 'boolean' ? j.isRemote : null;
+    let basis: 'ats' | 'text' | null = remote === null ? null : 'ats';
+    if (remote === null) ({ remote, basis } = remoteFromText(locations, title));
+    const sal = j.compensation?.summaryComponents?.find((c) => c.compensationType === 'Salary');
+    const summary =
+        str(j.compensation?.compensationTierSummary) ?? str(j.compensation?.scrapeableCompensationSalarySummary);
+    const compensation: Compensation | null =
+        sal || summary
+            ? {
+                  summary,
+                  min: sal?.minValue ?? null,
+                  max: sal?.maxValue ?? null,
+                  currency: sal?.currencyCode ?? null,
+                  interval: sal?.interval ?? null,
+              }
+            : null;
+    return withCountries(
+        {
+            ats: 'ashby',
+            board: slug,
+            company,
+            job_id: j.id,
+            title,
+            department: str(j.department),
+            team: str(j.team),
+            locations,
+            remote,
+            remote_basis: basis,
+            workplace_type: workplace(wt, null),
+            employment_type: j.employmentType ? (EMPLOYMENT[j.employmentType] ?? j.employmentType) : null,
+            compensation,
+            posted_at: toIso(j.publishedAt),
+            ats_updated_at: null,
+            apply_url: str(j.applyUrl) ?? str(j.jobUrl),
+            job_url: str(j.jobUrl),
+            description_text: withDescription ? clip(str(j.descriptionPlain)) : null,
+            detail_url: null,
+        },
+        countryNames,
+    );
+}
+
+// ---------------- SmartRecruiters ----------------
+interface SrJob {
+    id: string;
+    name: string;
+    releasedDate?: string;
+    company?: { identifier?: string; name?: string };
+    location?: {
+        city?: string;
+        region?: string;
+        country?: string;
+        remote?: boolean;
+        hybrid?: boolean;
+        fullLocation?: string;
+    };
+    department?: { label?: string };
+    function?: { label?: string };
+    typeOfEmployment?: { label?: string };
+    ref?: string;
+}
+
+export function mapSmartRecruiters(slug: string, j: SrJob, company: string): NormalizedJob {
+    const l = j.location ?? {};
+    const loc =
+        str(l.fullLocation) ?? compact([l.city ?? null, l.region ?? null, l.country?.toUpperCase() ?? null]).join(', ');
+    const locations = loc ? [loc] : [];
+    const remote = typeof l.remote === 'boolean' ? l.remote : null;
+    const ident = j.company?.identifier ?? slug;
+    return withCountries(
+        {
+            ats: 'smartrecruiters',
+            board: slug,
+            company: str(j.company?.name) ?? company,
+            job_id: String(j.id),
+            title: (j.name ?? '').trim(),
+            department: str(j.department?.label),
+            team: str(j.function?.label),
+            locations,
+            remote,
+            remote_basis: remote === null ? null : 'ats',
+            workplace_type: workplace(srWorkplace(l), null),
+            employment_type: str(j.typeOfEmployment?.label),
+            compensation: null,
+            posted_at: toIso(j.releasedDate),
+            ats_updated_at: null,
+            apply_url: `https://jobs.smartrecruiters.com/${enc(ident)}/${enc(String(j.id))}`,
+            job_url: `https://jobs.smartrecruiters.com/${enc(ident)}/${enc(String(j.id))}`,
+            description_text: null,
+            detail_url: detailUrl('smartrecruiters', slug, String(j.id)),
+        },
+        compact([l.country ?? null]),
+    );
+}
+
+/** Text from a SmartRecruiters posting detail (jobAd.sections). */
+export function srDetailDescription(detail: unknown): string | null {
+    const sections = (detail as { jobAd?: { sections?: Record<string, { title?: string; text?: string }> } })?.jobAd
+        ?.sections;
+    if (!sections) return null;
+    const parts: string[] = [];
+    for (const s of Object.values(sections)) {
+        const t = htmlToText(s?.text);
+        if (t) parts.push(s?.title ? `${s.title}\n${t}` : t);
+    }
+    return clip(parts.join('\n\n') || null);
+}
+
+// ---------------- board fetch ----------------
+export async function fetchBoard(client: AtsClient, ats: Ats, slug: string, o: FetchOpts): Promise<BoardFetch> {
+    const hint = o.companyHint ?? slug;
+    if (ats === 'smartrecruiters') {
+        const jobs: NormalizedJob[] = [];
+        let total = 0;
+        let offset = 0;
+        let requests = 0;
+        let company: string | null = null;
+        const first = listUrl(ats, slug);
+        for (;;) {
+            const r = await client.getJson<{ totalFound?: number; content?: SrJob[] }>(listUrl(ats, slug, { offset }));
+            requests++;
+            if (r.status === 404 || !r.json)
+                return {
+                    company: null,
+                    jobs: [],
+                    total: 0,
+                    complete: false,
+                    sourceUrl: first,
+                    requests,
+                    notFound: true,
+                };
+            total = r.json.totalFound ?? 0;
+            const page = r.json.content ?? [];
+            if (requests === 1 && total === 0) {
+                // SmartRecruiters answers 200 + totalFound 0 for unknown company ids, so 0 is "not found or empty".
+                return {
+                    company: null,
+                    jobs: [],
+                    total: 0,
+                    complete: true,
+                    sourceUrl: first,
+                    requests,
+                    notFound: true,
+                };
+            }
+            for (const j of page) {
+                company ??= str(j.company?.name);
+                jobs.push(mapSmartRecruiters(slug, j, hint));
+            }
+            offset += page.length;
+            if (!page.length || offset >= total) break;
+            if (jobs.length >= o.maxJobs || o.shouldStop?.()) {
+                return {
+                    company,
+                    jobs: jobs.slice(0, o.maxJobs),
+                    total,
+                    complete: false,
+                    sourceUrl: first,
+                    requests,
+                    notFound: false,
+                };
+            }
+        }
+        return { company, jobs, total, complete: jobs.length >= total, sourceUrl: first, requests, notFound: false };
+    }
+
+    const url = listUrl(ats, slug);
+    const r = await client.getJson<unknown>(url);
+    if (r.status === 404 || r.json === null) {
+        return { company: null, jobs: [], total: 0, complete: false, sourceUrl: url, requests: 1, notFound: true };
+    }
+    let jobs: NormalizedJob[];
+    let company: string | null = null;
+    if (ats === 'greenhouse') {
+        const raw = ((r.json as { jobs?: GhJob[] }).jobs ?? []) as GhJob[];
+        company = str(raw[0]?.company_name);
+        jobs = raw.map((j) => mapGreenhouse(slug, j, company ?? hint, o.withDescription));
+    } else if (ats === 'lever') {
+        const raw = (Array.isArray(r.json) ? r.json : []) as LeverJob[];
+        jobs = raw.map((j) => mapLever(slug, j, hint, o.withDescription));
+    } else {
+        const raw = ((r.json as { jobs?: AshbyJob[] }).jobs ?? []).filter((j) => j.isListed !== false);
+        jobs = raw.map((j) => mapAshby(slug, j, hint, o.withDescription));
+    }
+    const total = jobs.length;
+    const complete = total <= o.maxJobs;
+    return {
+        company,
+        jobs: complete ? jobs : jobs.slice(0, o.maxJobs),
+        total,
+        complete,
+        sourceUrl: url,
+        requests: 1,
+        notFound: false,
+    };
+}
+
+/** Cheap existence check used by slug probing. */
+export async function probeBoard(
+    client: AtsClient,
+    ats: Ats,
+    slug: string,
+): Promise<{ found: boolean; company: string | null; url: string }> {
+    let url: string;
+    switch (ats) {
+        case 'greenhouse':
+            url = `${base(ats)}/v1/boards/${enc(slug)}`;
+            break;
+        case 'lever':
+            url = listUrl(ats, slug, { limit: 1 });
+            break;
+        case 'ashby':
+            url = listUrl(ats, slug);
+            break;
+        default:
+            url = listUrl(ats, slug, { limit: 1 });
+    }
+    const r = await client.getJson<unknown>(url);
+    if (r.status !== 200 || r.json === null) return { found: false, company: null, url };
+    if (ats === 'greenhouse') return { found: true, company: str((r.json as { name?: string }).name), url };
+    if (ats === 'smartrecruiters') {
+        const j = r.json as { totalFound?: number; content?: SrJob[] };
+        return { found: (j.totalFound ?? 0) > 0, company: str(j.content?.[0]?.company?.name), url };
+    }
+    if (ats === 'lever') return { found: Array.isArray(r.json), company: null, url };
+    return { found: Array.isArray((r.json as { jobs?: unknown[] }).jobs), company: null, url };
+}

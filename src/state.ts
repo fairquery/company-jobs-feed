@@ -1,0 +1,168 @@
+import { normText, sha1 } from './normalize.js';
+import { type Ats, CLOSED_RETENTION_DAYS, type NormalizedJob, REPOST_WINDOW_DAYS } from './types.js';
+
+/** Per-job history entry (short keys keep the KV record small). */
+export interface JobEntry {
+    f: string; // first_seen_at
+    l: string; // last_seen_at
+    h: string; // content hash
+    fp: string; // fingerprint
+    t: string; // title (for closed rows)
+    loc?: string; // primary location (for closed rows)
+    c?: string; // closed_at (we stopped seeing it in a complete fetch)
+    ro?: string; // repost_of
+}
+
+export interface BoardState {
+    v: 1;
+    ats: Ats;
+    slug: string;
+    company?: string;
+    updated_at: string;
+    runs: number;
+    jobs: Record<string, JobEntry>;
+}
+
+export interface JobHistory {
+    first_seen_at: string;
+    last_seen_at: string;
+    change: 'new' | 'updated' | 'unchanged' | null;
+    repost_of: string | null;
+}
+
+export interface ClosedJob {
+    job_id: string;
+    entry: JobEntry;
+}
+
+export interface HistoryResult {
+    state: BoardState;
+    perJob: Map<string, JobHistory>;
+    closed: ClosedJob[];
+    baseline: boolean;
+    counts: { new: number; updated: number; closed: number; reposted: number };
+}
+
+export function contentHash(j: NormalizedJob): string {
+    return sha1(
+        JSON.stringify([
+            j.title,
+            j.locations,
+            j.department,
+            j.team,
+            j.employment_type,
+            j.workplace_type,
+            j.compensation?.summary ?? null,
+            j.compensation?.min ?? null,
+            j.compensation?.max ?? null,
+        ]),
+    ).slice(0, 12);
+}
+
+export function stateKey(ats: Ats, slug: string): string {
+    const safe = slug.toLowerCase().replace(/[^a-z0-9._-]/g, '_');
+    return `board_${ats}_${safe}`.slice(0, 250);
+}
+
+const DAY = 86_400_000;
+
+/**
+ * Merge this run's listing with the stored history of a board.
+ * - first_seen/last_seen per job id; change = new / updated / unchanged
+ * - jobs that were open last run and are missing from a COMPLETE fetch now are closed (emitted once)
+ * - repost: a new id whose fingerprint matches a job that closed within REPOST_WINDOW_DAYS (incl. now)
+ */
+export function applyHistory(
+    prev: BoardState | null,
+    ats: Ats,
+    slug: string,
+    jobs: NormalizedJob[],
+    fps: Map<string, string>,
+    nowIso: string,
+    complete: boolean,
+): HistoryResult {
+    const now = Date.parse(nowIso);
+    const old = prev?.jobs ?? {};
+    const current = new Set(jobs.map((j) => j.job_id));
+    const counts = { new: 0, updated: 0, closed: 0, reposted: 0 };
+    const nextJobs: Record<string, JobEntry> = {};
+    const closed: ClosedJob[] = [];
+
+    // 1) closures (only when we saw the whole board)
+    for (const [id, e] of Object.entries(old)) {
+        if (current.has(id)) continue;
+        if (!e.c && complete && prev) {
+            const ce = { ...e, c: nowIso };
+            nextJobs[id] = ce;
+            closed.push({ job_id: id, entry: ce });
+            counts.closed++;
+        } else if (!e.c || now - Date.parse(e.c) < CLOSED_RETENTION_DAYS * DAY) {
+            nextJobs[id] = e; // still open but board truncated, or recently closed: keep
+        }
+    }
+    // index of recently closed jobs by fingerprint, for repost detection
+    const closedByFp = new Map<string, string>();
+    for (const [id, e] of Object.entries(nextJobs)) {
+        if (e.c && now - Date.parse(e.c) <= REPOST_WINDOW_DAYS * DAY && !closedByFp.has(e.fp)) closedByFp.set(e.fp, id);
+    }
+
+    // 2) current jobs
+    const perJob = new Map<string, JobHistory>();
+    for (const j of jobs) {
+        const fp = fps.get(j.job_id) ?? '';
+        const h = contentHash(j);
+        const e = old[j.job_id];
+        let change: JobHistory['change'];
+        let first = nowIso;
+        let ro: string | undefined;
+        if (e) {
+            first = e.f;
+            ro = e.ro;
+            if (e.c) change = 'new';
+            else change = e.h === h ? 'unchanged' : 'updated';
+        } else {
+            change = 'new';
+            const match = prev ? closedByFp.get(fp) : undefined;
+            if (match && match !== j.job_id) {
+                ro = match;
+                counts.reposted++;
+            }
+        }
+        if (change === 'new') counts.new++;
+        if (change === 'updated') counts.updated++;
+        nextJobs[j.job_id] = { f: first, l: nowIso, h, fp, t: j.title, loc: j.locations[0], ro };
+        if (!ro) delete nextJobs[j.job_id].ro;
+        if (!nextJobs[j.job_id].loc) delete nextJobs[j.job_id].loc;
+        perJob.set(j.job_id, { first_seen_at: first, last_seen_at: nowIso, change, repost_of: ro ?? null });
+    }
+
+    return {
+        state: {
+            v: 1,
+            ats,
+            slug,
+            company: prev?.company,
+            updated_at: nowIso,
+            runs: (prev?.runs ?? 0) + 1,
+            jobs: nextJobs,
+        },
+        perJob,
+        closed,
+        baseline: !prev,
+        counts,
+    };
+}
+
+/** Discovery cache entry: found boards or a negative result, valid for DISCOVERY_CACHE_DAYS. */
+export interface DiscoveryCacheEntry {
+    v: 1;
+    input: string;
+    at: string;
+    company: string | null;
+    domain: string | null;
+    boards: { ats: Ats; slug: string; via: string; confidence: 'high' | 'medium' }[];
+}
+
+export function discoveryKey(input: string): string {
+    return `disc_${sha1(normText(input)).slice(0, 24)}`;
+}

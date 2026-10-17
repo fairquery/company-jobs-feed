@@ -1,0 +1,226 @@
+{
+    "$schema": "https://apify.com/schemas/v1/input.ide.json",
+    "title": "Company Jobs Feed",
+    "description": "Live, open jobs from companies' own hiring systems (Greenhouse, Lever, Ashby, SmartRecruiters) via their official public job-board APIs. Give companies (names, domains or board URLs) and/or explicit boards, or search the verified starter list.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "companies": {
+            "title": "Companies",
+            "type": "array",
+            "editor": "stringList",
+            "sectionCaption": "What to scan",
+            "description": "Company names, domains (ramp.com) or board URLs (https://jobs.lever.co/palantir). Seeded companies and board URLs resolve for free; others use discovery (see below). Max 200.",
+            "prefill": ["stripe.com", "https://jobs.lever.co/palantir"],
+            "example": ["stripe.com", "Ramp", "https://jobs.lever.co/palantir"]
+        },
+        "boards": {
+            "title": "Boards (explicit)",
+            "type": "array",
+            "editor": "json",
+            "description": "Exact boards: [{\"ats\":\"greenhouse|lever|ashby|smartrecruiters\",\"slug\":\"...\"}], or strings like \"ashby:ramp\" or board URLs. Optional company/domain per board. Max 500.",
+            "prefill": [{ "ats": "ashby", "slug": "ramp" }],
+            "example": [
+                { "ats": "greenhouse", "slug": "stripe" },
+                { "ats": "smartrecruiters", "slug": "BoschGroup", "company": "Bosch" }
+            ]
+        },
+        "useSeedList": {
+            "title": "Scan the verified starter list",
+            "type": "boolean",
+            "description": "Add every board from the shipped starter list (59 verified company boards) so you can search them without bringing your own list. Each board is billed as one board scanned.",
+            "default": false
+        },
+        "discover": {
+            "title": "Discover boards for unknown companies",
+            "type": "boolean",
+            "description": "For a company that is not a board URL or in the starter list: read up to 3 pages of its own website (only where robots.txt allows) for links to a supported ATS, then try up to 6 slug probes on the documented APIs. Results are cached for 30 days; cached lookups are free.",
+            "default": true
+        },
+        "titleIncludes": {
+            "title": "Title includes (any)",
+            "type": "array",
+            "editor": "stringList",
+            "sectionCaption": "Search filters",
+            "description": "Keep jobs whose title contains any of these words or phrases (case-insensitive, whole words: \"engineer\" does not match \"Engineering\").",
+            "prefill": ["engineer"]
+        },
+        "titleExcludes": {
+            "title": "Title excludes (any)",
+            "type": "array",
+            "editor": "stringList",
+            "description": "Drop jobs whose title contains any of these words.",
+            "prefill": ["intern"]
+        },
+        "titleRegex": {
+            "title": "Title regex",
+            "type": "string",
+            "editor": "textfield",
+            "description": "Optional case-insensitive regular expression the title must match (max 200 characters, no nested quantifiers)."
+        },
+        "locations": {
+            "title": "Locations (any)",
+            "type": "array",
+            "editor": "stringList",
+            "description": "Substring match on the job's location text, e.g. \"new york\", \"berlin\". \"remote\" also matches jobs the ATS flags as remote."
+        },
+        "countries": {
+            "title": "Countries (ISO-2, any)",
+            "type": "array",
+            "editor": "stringList",
+            "description": "ISO-2 codes like US, DE, GB. Uses the ATS's structured country where it has one (Lever, Ashby, SmartRecruiters), otherwise a small place-name list on the location text (country_basis says which). Jobs with no country information are dropped when this is set."
+        },
+        "remote": {
+            "title": "Remote",
+            "type": "string",
+            "editor": "select",
+            "description": "only = remote jobs only; exclude = drop remote jobs. Uses the ATS's remote flag where present, otherwise the location text (remote_basis says which).",
+            "enum": ["any", "only", "exclude"],
+            "enumTitles": ["Any", "Remote only", "Exclude remote"],
+            "default": "any"
+        },
+        "companyFilter": {
+            "title": "Company name contains (any)",
+            "type": "array",
+            "editor": "stringList",
+            "description": "Keep only jobs whose company name or board slug contains any of these (useful with the starter list)."
+        },
+        "departments": {
+            "title": "Departments / teams (any)",
+            "type": "array",
+            "editor": "stringList",
+            "description": "Substring match on department or team, e.g. \"engineering\", \"sales\"."
+        },
+        "employmentTypes": {
+            "title": "Employment types (any)",
+            "type": "array",
+            "editor": "stringList",
+            "description": "Substring match on employment type, e.g. \"full time\", \"contract\", \"intern\"."
+        },
+        "postedWithinDays": {
+            "title": "Posted within (days)",
+            "type": "integer",
+            "description": "Keep jobs whose ATS publish date (posted_at) is at most this many days ago. Jobs without a publish date are dropped unless 'Include unknown posted date' is on.",
+            "minimum": 1,
+            "maximum": 3650
+        },
+        "includeUnknownPostedDate": {
+            "title": "Include unknown posted date",
+            "type": "boolean",
+            "description": "With 'Posted within', also keep jobs whose ATS gives no publish date.",
+            "default": false
+        },
+        "maxAgeDays": {
+            "title": "Max age (days)",
+            "type": "integer",
+            "description": "Drop jobs older than this. Age = now − posted_at, or now − first_seen_at when the ATS has no date (age_basis).",
+            "minimum": 1,
+            "maximum": 3650
+        },
+        "hasSalary": {
+            "title": "Only jobs with published pay",
+            "type": "boolean",
+            "description": "Keep only jobs where the ATS publishes compensation (mainly Ashby and some Lever boards).",
+            "default": false
+        },
+        "excludeStale": {
+            "title": "Exclude stale signals",
+            "type": "boolean",
+            "description": "Drop jobs flagged long_open (older than 'Long-open threshold') or reposted. These are heuristics, not proof either way.",
+            "default": false
+        },
+        "longOpenDays": {
+            "title": "Long-open threshold (days)",
+            "type": "integer",
+            "description": "A job older than this is flagged long_open.",
+            "default": 60,
+            "minimum": 1,
+            "maximum": 3650
+        },
+        "onlyNew": {
+            "title": "Only new or changed jobs",
+            "type": "boolean",
+            "sectionCaption": "Monitoring & history",
+            "description": "Return only jobs that are new or changed since the last tracked run with the same state store (plus free 'closed' rows). The first run is the baseline: everything is new.",
+            "default": false
+        },
+        "trackChanges": {
+            "title": "Track history",
+            "type": "boolean",
+            "description": "Keep per-board history (first_seen_at, last_seen_at, closed and repost detection) in a named key-value store in your account. Turn off to store nothing; history fields then describe this run only.",
+            "default": true
+        },
+        "emitClosed": {
+            "title": "Emit closed rows",
+            "type": "boolean",
+            "description": "When tracking, emit one free row (change: closed) for each job that was open last run and is gone from a complete fetch now.",
+            "default": true
+        },
+        "stateStoreName": {
+            "title": "State store name",
+            "type": "string",
+            "editor": "textfield",
+            "description": "Named key-value store for history and the discovery cache. Use a different name per saved search/monitor.",
+            "default": "fairquery-jobs-feed-state"
+        },
+        "dedupe": {
+            "title": "De-duplication",
+            "type": "string",
+            "editor": "select",
+            "sectionCaption": "Output",
+            "description": "exact = one row per ats+board+job id; role = also merge one board's rows with the same title + department into one row listing all locations (merged rows are free); none = no de-duplication. Every row carries a fingerprint and duplicate_of; nothing is silently dropped across boards.",
+            "enum": ["exact", "role", "none"],
+            "enumTitles": ["Exact (job id)", "Role (title + department)", "None"],
+            "default": "exact"
+        },
+        "includeDescription": {
+            "title": "Description",
+            "type": "string",
+            "editor": "select",
+            "description": "text = plain-text job description (up to 20,000 characters). SmartRecruiters descriptions need 'Re-check each job' because its list endpoint has none.",
+            "enum": ["none", "text"],
+            "enumTitles": ["None", "Plain text"],
+            "default": "none"
+        },
+        "scrubPII": {
+            "title": "Scrub e-mails and phone numbers",
+            "type": "boolean",
+            "description": "Remove e-mail addresses and phone numbers (e.g. recruiter contacts) from descriptions.",
+            "default": true
+        },
+        "confirmOpen": {
+            "title": "Re-check each job (detail endpoint)",
+            "type": "string",
+            "editor": "select",
+            "description": "detail = re-fetch each emitted job from the ATS's documented per-job endpoint (Greenhouse, Lever, SmartRecruiters; Ashby has none). A 404 marks it closed. $0.00029 per re-check; off by default because the board listing is already the employer's live list.",
+            "enum": ["none", "detail"],
+            "enumTitles": ["Off", "Re-check via detail endpoint"],
+            "default": "none"
+        },
+        "maxOpenChecks": {
+            "title": "Max re-checks",
+            "type": "integer",
+            "description": "Cap on detail re-checks per run.",
+            "default": 200,
+            "minimum": 1,
+            "maximum": 2000
+        },
+        "maxJobs": {
+            "title": "Max jobs",
+            "type": "integer",
+            "sectionCaption": "Limits",
+            "description": "Stop after this many job rows (the main cost driver: $0.99 per 1,000).",
+            "default": 5000,
+            "minimum": 1,
+            "maximum": 50000
+        },
+        "maxJobsPerBoard": {
+            "title": "Max jobs read per board",
+            "type": "integer",
+            "description": "Safety cap on postings read from one board (SmartRecruiters pages 100 at a time). A truncated board skips closed detection.",
+            "default": 10000,
+            "minimum": 1,
+            "maximum": 20000
+        }
+    }
+}
