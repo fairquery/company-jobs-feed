@@ -17,3 +17,7 @@ jobs:
             - run: npm ci
             - run: npm run build
             - run: npm test
+            - run: npx eslint src
+            - run: npm --prefix mcp ci --ignore-scripts
+            - run: npm --prefix mcp run build
+            - run: npm --prefix mcp test
