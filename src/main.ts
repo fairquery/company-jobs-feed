@@ -336,7 +336,8 @@ async function resolveCompany(rawInput: string): Promise<void> {
     const company = d.company ?? label ?? null;
     const domain = d.domain ? registrableDomain(d.domain) : null;
     const found = d.boards.map((b) => ({ ats: b.ats, slug: b.slug, via: b.via, confidence: b.confidence }));
-    const transient = d.notes.some((n) => n.code === 'HOST_BLOCKED' || n.code === 'NETWORK_ERROR');
+    // Cache negatives only when discovery ran cleanly: a robots/DNS/network/block note means "couldn't look", not "no board".
+    const transient = d.notes.length > 0 || stop.aborting || emitter.limitReached;
     if (store && (found.length || !transient)) {
         const entry: DiscoveryCacheEntry = {
             v: 1,
@@ -588,22 +589,23 @@ async function scanBoard(b: BoardRef): Promise<void> {
         reposted: hist ? hist.counts.reposted : null,
         requests: fetched.requests,
     };
-    if (await emitter.emit(boardRow, [CHARGE_EVENTS.board])) counters.boards_scanned++;
+    const boardBilled = await emitter.emit(boardRow, [CHARGE_EVENTS.board]);
+    if (boardBilled) counters.boards_scanned++;
     else {
         // Budget exhausted: the board row is not billable, so report the partial board as a free error row instead.
         await pushError({
             code: 'RUN_BUDGET_REACHED',
-            message: `${b.ats}/${b.slug}: ${emitted} of ${matched} matching jobs delivered before the run's max cost per run was reached; board not billed. Raise "Max cost per run" or lower maxJobs.`,
+            message: `${b.ats}/${b.slug}: ${emitted} of ${matched} matching jobs delivered before the run's max cost per run was reached; board not billed and its history not saved. Raise "Max cost per run" or lower maxJobs.`,
             retryable: true,
             ats: b.ats,
             board: b.slug,
             source_url: fetched.sourceUrl,
         });
     }
-    if (truncated && fetched.complete) {
+    if (boardBilled && truncated && fetched.complete) {
         await pushError({
             code: 'BOARD_TRUNCATED',
-            message: `${b.ats}/${b.slug}: output stopped after ${emitted} of ${matched} matching jobs (${stop.reason || 'run stop'}). History not saved for this board, so the next onlyNew run will still include the rest.`,
+            message: `${b.ats}/${b.slug}: output stopped after ${emitted} of ${matched} matching jobs (${stop.reason || (emitter.limitReached ? 'max_cost_per_run' : 'run stop')}). History not saved for this board, so the next onlyNew run will still include the rest.`,
             retryable: true,
             ats: b.ats,
             board: b.slug,

@@ -244,5 +244,111 @@
   "types": {
    "error": 1
   }
+ },
+ "H_discovery_robots_redirect": {
+  "id": "ug5uknFEzteOwIQfd",
+  "status": "SUCCEEDED",
+  "build": "1.0.2",
+  "mem": 256,
+  "secs": 2.188,
+  "cu": 0.00015194444444444446,
+  "usageUsd": 0.0006976190804921919,
+  "usage": {
+   "ACTOR_COMPUTE_UNITS": 3.0388888888888894e-05,
+   "DATASET_READS": 0,
+   "DATASET_WRITES": 0.00044500000000000003,
+   "KEY_VALUE_STORE_READS": 2e-05,
+   "KEY_VALUE_STORE_WRITES": 0.0002,
+   "KEY_VALUE_STORE_LISTS": 0,
+   "REQUEST_QUEUE_READS": 0,
+   "REQUEST_QUEUE_WRITES": 0,
+   "DATA_TRANSFER_INTERNAL_GBYTES": 2.2301916033029557e-06,
+   "DATA_TRANSFER_EXTERNAL_GBYTES": 0,
+   "PROXY_RESIDENTIAL_TRANSFER_GBYTES": 0,
+   "PROXY_SERPS": 0,
+   "PROXY_UNBLOCKER_UNITS": 0
+  },
+  "charged": {
+   "job-result": 85,
+   "board-scanned": 1,
+   "open-confirmed": 0,
+   "company-discovered": 0
+  },
+  "revenue": 0.08465,
+  "types": {
+   "company": 2,
+   "error": 1,
+   "job": 85,
+   "board": 1
+  }
+ },
+ "I_budget_anduril_large": {
+  "id": "gC1EekbgjXuDHbJSm",
+  "status": "SUCCEEDED",
+  "build": "1.0.2",
+  "mem": 256,
+  "secs": 3.695,
+  "cu": 0.00025659722222222224,
+  "usageUsd": 0.0007340180362429886,
+  "usage": {
+   "ACTOR_COMPUTE_UNITS": 5.131944444444445e-05,
+   "DATASET_READS": 0,
+   "DATASET_WRITES": 0.0005200000000000001,
+   "KEY_VALUE_STORE_READS": 5e-06,
+   "KEY_VALUE_STORE_WRITES": 0.00015000000000000001,
+   "KEY_VALUE_STORE_LISTS": 0,
+   "REQUEST_QUEUE_READS": 0,
+   "REQUEST_QUEUE_WRITES": 0,
+   "DATA_TRANSFER_INTERNAL_GBYTES": 1.4438293874263765e-06,
+   "DATA_TRANSFER_EXTERNAL_GBYTES": 6.254762411117554e-06,
+   "PROXY_RESIDENTIAL_TRANSFER_GBYTES": 0,
+   "PROXY_SERPS": 0,
+   "PROXY_UNBLOCKER_UNITS": 0
+  },
+  "charged": {
+   "job-result": 101,
+   "board-scanned": 0,
+   "open-confirmed": 0,
+   "company-discovered": 0
+  },
+  "revenue": 0.09999,
+  "types": {
+   "error": 3,
+   "job": 101
+  }
+ },
+ "J_history_rerun_stripe_ramp": {
+  "id": "qcVJ9geNcNp9lLw74",
+  "status": "SUCCEEDED",
+  "build": "1.0.2",
+  "mem": 256,
+  "secs": 2.024,
+  "cu": 0.00014055555555555555,
+  "usageUsd": 0.0002578501925981707,
+  "usage": {
+   "ACTOR_COMPUTE_UNITS": 2.811111111111111e-05,
+   "DATASET_READS": 0,
+   "DATASET_WRITES": 1e-05,
+   "KEY_VALUE_STORE_READS": 1.5000000000000002e-05,
+   "KEY_VALUE_STORE_WRITES": 0.0002,
+   "KEY_VALUE_STORE_LISTS": 0,
+   "REQUEST_QUEUE_READS": 0,
+   "REQUEST_QUEUE_WRITES": 0,
+   "DATA_TRANSFER_INTERNAL_GBYTES": 4.739081487059593e-06,
+   "DATA_TRANSFER_EXTERNAL_GBYTES": 0,
+   "PROXY_RESIDENTIAL_TRANSFER_GBYTES": 0,
+   "PROXY_SERPS": 0,
+   "PROXY_UNBLOCKER_UNITS": 0
+  },
+  "charged": {
+   "job-result": 0,
+   "board-scanned": 2,
+   "open-confirmed": 0,
+   "company-discovered": 0
+  },
+  "revenue": 0.001,
+  "types": {
+   "board": 2
+  }
  }
 }
