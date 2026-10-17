@@ -90,5 +90,16 @@
   ],
   "stateStoreName": "fq-jobs-costtest",
   "onlyNew": true
+ },
+ "K_discovery_after_fix": {
+  "companies": [
+   "gem.com",
+   "vanta.com",
+   "sentry.io"
+  ],
+  "stateStoreName": "fq-jobs-disc2",
+  "titleIncludes": [
+   "engineer"
+  ]
  }
 }

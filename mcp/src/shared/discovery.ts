@@ -206,11 +206,17 @@ export async function discoverCompany(
         const seen = new Set<string>();
         while (queue.length && out.pagesFetched.length < MAX_CAREERS_PAGES_PER_DOMAIN && !opts.shouldStop?.()) {
             const url = queue.shift()!;
-            if (seen.has(url)) continue;
+            if (seen.has(url) || seen.has(url.replace(/\/$/, ''))) continue;
             seen.add(url);
             try {
                 const page = await careers.getPage(url);
-                out.pagesFetched.push(page.url);
+                if (!out.pagesFetched.includes(page.url)) out.pagesFetched.push(page.url);
+                seen.add(page.url);
+                // Site redirects (vanta.com -> www.vanta.com): build fallbacks on the final origin to avoid a wasted hop.
+                const finalOrigin = new URL(page.url).origin;
+                if (finalOrigin !== `https://${out.domain}` && registrableDomain(new URL(page.url).hostname) === site)
+                    for (let i = 0; i < fallbacks.length; i++)
+                        fallbacks[i] = fallbacks[i].replace(`https://${out.domain}`, finalOrigin);
                 if (registrableDomain(new URL(page.url).hostname) !== site) {
                     // redirected off-site (e.g. straight to an ATS board): accept only an ATS board URL
                     const b = parseBoardUrl(page.url);

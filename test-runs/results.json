@@ -350,5 +350,42 @@
   "types": {
    "board": 2
   }
+ },
+ "K_discovery_after_fix": {
+  "id": "7vE3ef5w0OswPyduB",
+  "status": "SUCCEEDED",
+  "build": "1.0.3",
+  "mem": 256,
+  "secs": 4.778,
+  "cu": 0.00033180555555555556,
+  "usageUsd": 0.00012523661524719662,
+  "usage": {
+   "ACTOR_COMPUTE_UNITS": 6.636111111111111e-05,
+   "DATASET_READS": 0,
+   "DATASET_WRITES": 0.000315,
+   "KEY_VALUE_STORE_READS": 5e-06,
+   "KEY_VALUE_STORE_WRITES": 0.0004,
+   "KEY_VALUE_STORE_LISTS": 0,
+   "REQUEST_QUEUE_READS": 0,
+   "REQUEST_QUEUE_WRITES": 0,
+   "DATA_TRANSFER_INTERNAL_GBYTES": 2.5177840143442156e-06,
+   "DATA_TRANSFER_EXTERNAL_GBYTES": 4.1583552956581116e-06,
+   "PROXY_RESIDENTIAL_TRANSFER_GBYTES": 0,
+   "PROXY_SERPS": 0,
+   "PROXY_UNBLOCKER_UNITS": 0
+  },
+  "charged": {
+   "job-result": 58,
+   "board-scanned": 2,
+   "open-confirmed": 0,
+   "company-discovered": 2
+  },
+  "revenue": 0.06222,
+  "types": {
+   "company": 2,
+   "error": 1,
+   "job": 58,
+   "board": 2
+  }
  }
 }
