@@ -101,5 +101,18 @@
   "titleIncludes": [
    "engineer"
   ]
+ },
+ "L_smoke_build_1_0_4": {
+  "companies": [
+   "vanta.com"
+  ],
+  "boards": [
+   "ashby:ramp"
+  ],
+  "stateStoreName": "fq-jobs-smoke104",
+  "titleIncludes": [
+   "engineer"
+  ],
+  "remote": "only"
  }
 }

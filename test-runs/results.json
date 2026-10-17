@@ -358,7 +358,7 @@
   "mem": 256,
   "secs": 4.778,
   "cu": 0.00033180555555555556,
-  "usageUsd": 0.00012523661524719662,
+  "usageUsd": 0.0007930372504211134,
   "usage": {
    "ACTOR_COMPUTE_UNITS": 6.636111111111111e-05,
    "DATASET_READS": 0,
@@ -384,6 +384,42 @@
   "types": {
    "company": 2,
    "error": 1,
+   "job": 58,
+   "board": 2
+  }
+ },
+ "L_smoke_build_1_0_4": {
+  "id": "AnxRmnRh9KlkTZfdI",
+  "status": "SUCCEEDED",
+  "build": "1.0.4",
+  "mem": 256,
+  "secs": 4.023,
+  "cu": 0.000279375,
+  "usageUsd": 0.0006730269520133734,
+  "usage": {
+   "ACTOR_COMPUTE_UNITS": 5.5875e-05,
+   "DATASET_READS": 0,
+   "DATASET_WRITES": 0.00030500000000000004,
+   "KEY_VALUE_STORE_READS": 5e-06,
+   "KEY_VALUE_STORE_WRITES": 0.00030000000000000003,
+   "KEY_VALUE_STORE_LISTS": 0,
+   "REQUEST_QUEUE_READS": 0,
+   "REQUEST_QUEUE_WRITES": 0,
+   "DATA_TRANSFER_INTERNAL_GBYTES": 2.529425546526909e-06,
+   "DATA_TRANSFER_EXTERNAL_GBYTES": 4.6225264668464666e-06,
+   "PROXY_RESIDENTIAL_TRANSFER_GBYTES": 0,
+   "PROXY_SERPS": 0,
+   "PROXY_UNBLOCKER_UNITS": 0
+  },
+  "charged": {
+   "job-result": 58,
+   "board-scanned": 2,
+   "open-confirmed": 0,
+   "company-discovered": 1
+  },
+  "revenue": 0.06032,
+  "types": {
+   "company": 1,
    "job": 58,
    "board": 2
   }
