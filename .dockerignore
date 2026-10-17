@@ -16,3 +16,7 @@ node_modules
 
 # dist folder
 dist
+
+**/node_modules
+**/dist
+test-runs

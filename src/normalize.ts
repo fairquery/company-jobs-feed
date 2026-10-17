@@ -22,6 +22,16 @@ const ENTITIES: Record<string, string> = {
     trade: '™',
 };
 
+/** Display name from a board slug when the ATS gives none: "sentry" -> "Sentry", "scale-ai" -> "Scale Ai". Mixed-case slugs are kept. */
+export function prettySlug(slug: string): string {
+    if (/[A-Z]/.test(slug)) return slug;
+    return slug
+        .split(/[-_.]+/)
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+}
+
 export function decodeEntities(s: string): string {
     return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
         if (e[0] === '#') {

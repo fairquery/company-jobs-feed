@@ -1,6 +1,6 @@
 import { countriesFromText, countryToIso2 } from './gazetteer.js';
-import type { AtsClient } from './http.js';
-import { compact, htmlToText, textSaysRemote, toIso, uniq } from './normalize.js';
+import { type AtsClient, HttpError } from './http.js';
+import { compact, htmlToText, prettySlug, textSaysRemote, toIso, uniq } from './normalize.js';
 import {
     type Ats,
     ATS_API_HOSTS,
@@ -19,10 +19,10 @@ export function isValidSlug(s: string): boolean {
 const enc = encodeURIComponent;
 const base = (ats: Ats) => `https://${ATS_API_HOSTS[ats]}`;
 
-export function listUrl(ats: Ats, slug: string, opts: { offset?: number; limit?: number } = {}): string {
+export function listUrl(ats: Ats, slug: string, opts: { offset?: number; limit?: number; lite?: boolean } = {}): string {
     switch (ats) {
         case 'greenhouse':
-            return `${base(ats)}/v1/boards/${enc(slug)}/jobs?content=true`;
+            return `${base(ats)}/v1/boards/${enc(slug)}/jobs${opts.lite ? '' : '?content=true'}`;
         case 'lever':
             return `${base(ats)}/v0/postings/${enc(slug)}?mode=json${opts.limit ? `&limit=${opts.limit}` : ''}`;
         case 'ashby':
@@ -56,6 +56,8 @@ export interface BoardFetch {
     sourceUrl: string;
     requests: number;
     notFound: boolean;
+    /** Set when the board had to be read in a reduced form (e.g. Greenhouse list without content). */
+    note?: string;
 }
 
 export interface FetchOpts {
@@ -406,7 +408,7 @@ export function srDetailDescription(detail: unknown): string | null {
 
 // ---------------- board fetch ----------------
 export async function fetchBoard(client: AtsClient, ats: Ats, slug: string, o: FetchOpts): Promise<BoardFetch> {
-    const hint = o.companyHint ?? slug;
+    const hint = o.companyHint ?? prettySlug(slug);
     if (ats === 'smartrecruiters') {
         const jobs: NormalizedJob[] = [];
         let total = 0;
@@ -462,8 +464,21 @@ export async function fetchBoard(client: AtsClient, ats: Ats, slug: string, o: F
         return { company, jobs, total, complete: jobs.length >= total, sourceUrl: first, requests, notFound: false };
     }
 
-    const url = listUrl(ats, slug);
-    const r = await client.getJson<unknown>(url);
+    let url = listUrl(ats, slug);
+    let note: string | undefined;
+    let requests = 1;
+    let r: Awaited<ReturnType<AtsClient['getJson']>>;
+    try {
+        r = await client.getJson<unknown>(url);
+    } catch (e) {
+        // Very large Greenhouse boards exceed the size cap with content=true; the documented list without
+        // content still carries title, location, first_published, updated_at and metadata.
+        if (ats !== 'greenhouse' || !(e instanceof HttpError) || e.code !== 'RESPONSE_TOO_LARGE') throw e;
+        url = listUrl(ats, slug, { lite: true });
+        r = await client.getJson<unknown>(url);
+        requests = 2;
+        note = 'greenhouse_list_without_content: board too large for content=true, so department, offices and description are missing';
+    }
     if (r.status === 404 || r.json === null) {
         return { company: null, jobs: [], total: 0, complete: false, sourceUrl: url, requests: 1, notFound: true };
     }
@@ -488,8 +503,9 @@ export async function fetchBoard(client: AtsClient, ats: Ats, slug: string, o: F
         total,
         complete,
         sourceUrl: url,
-        requests: 1,
+        requests,
         notFound: false,
+        note,
     };
 }
 

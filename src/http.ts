@@ -269,11 +269,19 @@ export class CareersFetcher {
         return isAllowed(r, ROBOTS_AGENT, u.pathname + u.search);
     }
 
-    /** RFC 9309: 2xx = rules; 4xx = no rules (allowed); 5xx or unreachable = treat as fully disallowed. */
+    /**
+     * RFC 9309: follow up to 5 redirects (each hop SSRF-checked); 2xx = rules; 4xx = no rules (allowed);
+     * 5xx, unreachable or too many redirects = treat as fully disallowed.
+     */
     private async loadRobots(u: URL): Promise<Robots | HttpError> {
-        const url = new URL('/robots.txt', u.origin);
+        let url = new URL('/robots.txt', u.origin);
         try {
-            const res = await this.rawGet(url, 'text/plain,*/*;q=0.5', 500_000, 0);
+            let res = await this.rawGet(url, 'text/plain,*/*;q=0.5', 500_000, 0);
+            for (let hop = 0; hop < 5 && res.status >= 300 && res.status < 400 && res.location; hop++) {
+                url = new URL(res.location, url);
+                if (url.protocol !== 'https:' && url.protocol !== 'http:') break;
+                res = await this.rawGet(url, 'text/plain,*/*;q=0.5', 500_000, 0);
+            }
             if (res.status >= 200 && res.status < 300) return parseRobots(res.body);
             if (res.status >= 400 && res.status < 500) return parseRobots('');
             return new HttpError(

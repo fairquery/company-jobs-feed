@@ -1,0 +1,9 @@
+{
+ "A_stripe_greenhouse": {"boards":["greenhouse:stripe"],"titleIncludes":["engineer"],"locations":["remote","san francisco"],"includeDescription":"text","confirmOpen":"detail","maxOpenChecks":10},
+ "B_palantir_lever": {"companies":["https://jobs.lever.co/palantir"],"countries":["US"],"titleIncludes":["engineer"],"postedWithinDays":180},
+ "C_ramp_ashby": {"companies":["ramp.com"],"remote":"only","hasSalary":true,"dedupe":"role"},
+ "D_bosch_smartrecruiters": {"boards":[{"ats":"smartrecruiters","slug":"BoschGroup","company":"Bosch"}],"countries":["DE"],"titleIncludes":["software"],"postedWithinDays":14,"confirmOpen":"detail","maxOpenChecks":5},
+ "E_cost_full_4_boards": {"boards":["greenhouse:stripe","lever:palantir","ashby:ramp","smartrecruiters:BoschGroup"],"maxJobs":10000,"stateStoreName":"fq-jobs-costtest"},
+ "F_discovery": {"companies":["sentry.io","vanta.com","gem.com","Hightouch"]},
+ "G_input_empty": {}
+}

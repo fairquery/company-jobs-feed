@@ -576,3 +576,12 @@ describe('text helpers', () => {
         expect(scrubPII('mail a@b.co').redactions).toBe(1);
     });
 });
+
+describe('prettySlug', () => {
+    it('title-cases lowercase slugs and keeps mixed case', async () => {
+        const { prettySlug } = await import('../src/normalize.js');
+        expect(prettySlug('sentry')).toBe('Sentry');
+        expect(prettySlug('scale-ai')).toBe('Scale Ai');
+        expect(prettySlug('BoschGroup')).toBe('BoschGroup');
+    });
+});

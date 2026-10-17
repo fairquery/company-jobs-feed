@@ -167,6 +167,9 @@ Call from agents via [Apify MCP](https://mcp.apify.com) with Actor `fairquery/co
 | `ROBOTS_DISALLOWED` / `ROBOTS_UNAVAILABLE` | The company's robots.txt doesn't allow us to read that careers page; we then only try API probes. Pass the board URL instead |
 | `HOST_BLOCKED` | An ATS answered 403/429 and the kill switch stopped that host for this run. Rows are free; re-run later with fewer boards |
 | `BOARD_TRUNCATED` | The board has more postings than `maxJobsPerBoard`; closed-job detection is skipped for that board |
+| `RUN_BUDGET_REACHED` / `stopped_early: "max_cost_per_run"` | The run hit its **Max cost per run**. Nothing beyond it is charged; the partly delivered board is not billed and its history is not saved. Raise the limit or lower `maxJobs` |
+| `BOARD_REDUCED_FIELDS` | A very large Greenhouse board (over 40 MB with descriptions) was read from the lighter documented list: jobs are complete, but department, offices and description are empty |
+| `ROBOTS_UNAVAILABLE` on a site that works in a browser | Its robots.txt answers 5xx or redirects more than 5 times; RFC 9309 says not to crawl then. Pass the board URL |
 | Everything is `change: "new"` | First tracked run (baseline). From the second run on you get `unchanged`/`updated`/`closed` |
 | Wrong company matched | A `slug_probe` match (confidence `medium`) can be a different company with the same name; pass the exact board |
 

@@ -6,7 +6,7 @@ import { discoverCompany, domainOf, parseBoardUrl, registrableDomain, seedLookup
 import { Emitter } from './emitter.js';
 import { compileFilters, matches } from './filters.js';
 import { AtsClient, CareersFetcher, HostGate, HttpError } from './http.js';
-import { scrubPII } from './normalize.js';
+import { prettySlug, scrubPII } from './normalize.js';
 import { buildClosedRow, buildJobRow, jobFingerprint, type RowContext } from './rows.js';
 import { SEED_BOARDS } from './seed.js';
 import { applyHistory, type BoardState, type DiscoveryCacheEntry, discoveryKey, stateKey } from './state.js';
@@ -451,10 +451,20 @@ async function scanBoard(b: BoardRef): Promise<void> {
         });
         return;
     }
-    const company = b.company ?? fetched.company ?? b.slug;
+    if (fetched.note) {
+        await pushError({
+            code: 'BOARD_REDUCED_FIELDS',
+            message: `${b.ats}/${b.slug}: ${fetched.note}. Jobs are still listed and billed normally.`,
+            retryable: false,
+            ats: b.ats,
+            board: b.slug,
+            source_url: fetched.sourceUrl,
+        });
+    }
+    const company = b.company ?? fetched.company ?? prettySlug(b.slug);
     const domain = b.domain ?? null;
     for (const j of fetched.jobs)
-        if (!b.company && fetched.company && j.company === b.slug) j.company = fetched.company;
+        if (!b.company && fetched.company && j.company === prettySlug(b.slug)) j.company = fetched.company;
     counters.jobs_listed += fetched.jobs.length;
 
     const fps = new Map(fetched.jobs.map((j) => [j.job_id, jobFingerprint(j, domain)]));
@@ -579,6 +589,27 @@ async function scanBoard(b: BoardRef): Promise<void> {
         requests: fetched.requests,
     };
     if (await emitter.emit(boardRow, [CHARGE_EVENTS.board])) counters.boards_scanned++;
+    else {
+        // Budget exhausted: the board row is not billable, so report the partial board as a free error row instead.
+        await pushError({
+            code: 'RUN_BUDGET_REACHED',
+            message: `${b.ats}/${b.slug}: ${emitted} of ${matched} matching jobs delivered before the run's max cost per run was reached; board not billed. Raise "Max cost per run" or lower maxJobs.`,
+            retryable: true,
+            ats: b.ats,
+            board: b.slug,
+            source_url: fetched.sourceUrl,
+        });
+    }
+    if (truncated && fetched.complete) {
+        await pushError({
+            code: 'BOARD_TRUNCATED',
+            message: `${b.ats}/${b.slug}: output stopped after ${emitted} of ${matched} matching jobs (${stop.reason || 'run stop'}). History not saved for this board, so the next onlyNew run will still include the rest.`,
+            retryable: true,
+            ats: b.ats,
+            board: b.slug,
+            source_url: fetched.sourceUrl,
+        });
+    }
     if (!fetched.complete) {
         await pushError({
             code: 'BOARD_TRUNCATED',
@@ -637,6 +668,7 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>): Prom
 
 async function finish(exitOptions?: { exitCode: number; statusMessage: string }): Promise<never> {
     await emitter.flush();
+    shouldStop(); // records max_cost_per_run if the emitter hit the budget after the last check
     const { charged } = emitter;
     const estUsd = Object.entries(charged).reduce(
         (s, [e, n]) => s + n * (PRICES_USD[e as keyof typeof PRICES_USD] ?? 0),

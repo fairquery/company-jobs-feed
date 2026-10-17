@@ -28,7 +28,10 @@
         "start:dev": "tsx src/main.ts",
         "build": "tsc",
         "lint": "eslint",
-        "test": "vitest run"
+        "test": "vitest run",
+        "verify-seed": "tsx scripts/verify-seed.ts",
+        "mcp:build": "npm --prefix mcp ci --ignore-scripts && npm --prefix mcp run build",
+        "mcp:test": "npm --prefix mcp test"
     },
     "author": "Fairquery",
     "license": "MIT"

@@ -12,3 +12,7 @@ tsconfig.tsbuildinfo
 
 # Added by Apify CLI
 .venv
+
+test-runs/items_*.json
+mcp/node_modules
+mcp/dist
