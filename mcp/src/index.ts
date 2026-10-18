@@ -19,7 +19,7 @@ import { buildJobRow, jobFingerprint, type RowContext } from './shared/rows.js';
 import { SEED_BOARDS } from './shared/seed.js';
 import type { Ats } from './shared/types.js';
 
-export const VERSION = '1.0.4';
+export const VERSION = '1.0.5';
 const ATS = ['greenhouse', 'lever', 'ashby'] as const;
 
 const atsSchema = z
@@ -28,7 +28,7 @@ const atsSchema = z
 const slugSchema = z
     .string()
     .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/)
-    .describe('Required. Board slug as it appears in the public board URL (case-insensitive): boards.greenhouse.io/<slug>, jobs.lever.co/<slug>, jobs.ashbyhq.com/<slug>. Example: "ramp" or "palantir"');
+    .describe('Required. Board slug as it appears in the public board URL (case-insensitive): boards.greenhouse.io/{slug}, jobs.lever.co/{slug}, jobs.ashbyhq.com/{slug}; 1-100 chars: a letter or digit, then letters, digits, ".", "_" or "-". Example: "ramp" or "palantir"');
 const limitSchema = z.number().int().min(1).max(500).optional().describe('Optional page size, integer 1-500, default 50');
 const offsetSchema = z.number().int().min(0).optional().describe('Optional items to skip, integer >= 0, default 0; pass nextOffset from the previous response');
 const terms = (what: string, ex: string) => z.array(z.string().min(1).max(100)).max(50).optional().describe(`Optional, 0-50 strings, any-of. ${what} Example: ${ex}`);
@@ -48,7 +48,7 @@ function createServer(): McpServer {
                 'WHEN NOT: Many companies at once, history (new/closed/reposted since last run), or careers-page discovery at scale: use jobs_search_companies (paid). Unknown board: use jobs_find_board first. SmartRecruiters, LinkedIn, Workday, Workable and Recruitee are not supported and never contacted.',
                 'BEHAVIOR: Runs on your machine; one GET to the documented API host only (very large Greenhouse boards: a second, lighter GET). No token, nothing stored, no history: first_seen_at = now and change = null. Any HTTP 403/429 stops that host for the session (kill switch, HOST_BLOCKED error). Lever requests are spaced 1 s apart (its robots.txt Crawl-delay).',
                 'COST: Free.',
-                'RETURNS: Paged "job" rows (fields per the output schema). compensation appears only when the ATS publishes it; posted_at is the ATS date or null (never guessed), and age_basis says how age_days was derived. meta: jobs_total on the board, jobs_matched after filters, requests, complete.',
+                'RETURNS: Paged "job" rows. compensation only when the ATS publishes it; posted_at is the ATS date or null (never guessed); age_basis says how age_days was derived. meta: jobs_total, jobs_matched, requests, complete.',
                 'PARAMETERS: All filters are AND-ed; values inside one filter are OR-ed. titleIncludes/titleExcludes match whole words ("engineer" does not match "Engineering"). countries uses the ATS\'s structured country where present (Lever, Ashby) and a place-name list otherwise; rows without any country are dropped when countries is set. postedWithinDays drops rows with posted_at = null. Paging re-fetches the board, so pages from different calls can shift if the employer edits the board in between.',
                 'EXAMPLE: {"ats":"ashby","slug":"ramp","titleIncludes":["engineer"],"remote":"only"} -> remote engineering roles at Ramp with salary ranges.',
             ].join('\n'),
@@ -98,7 +98,7 @@ function createServer(): McpServer {
                 'WHAT: Resolve a company name, domain or careers/board URL to its public job board(s) on Greenhouse, Lever or Ashby.',
                 'WHEN: Before jobs_get_board when you only know the company ("Ramp", "sentry.io", "https://stripe.com/jobs").',
                 'WHEN NOT: You already have ats + slug (call jobs_get_board). For many companies plus their jobs in one step use jobs_search_companies (paid). It cannot find Workday, Workable, Recruitee or LinkedIn pages.',
-                'BEHAVIOR: Runs on your machine. Order: board-URL parsing -> verified starter list -> the company\'s own website (only for a domain/URL input; robots.txt respected, <= 3 pages, private/internal IPs refused) -> at most 6 GETs against the documented ATS APIs with slug guesses. Stops at the first hit. Nothing is cached or stored. Rate limits: max 2 parallel requests per host, Lever spaced 1 s apart, 15 s timeout per GET; network errors and HTTP 5xx are retried at most twice with backoff (0.5-1.6 s); HTTP 403/429 is never retried: that host is skipped for the rest of the session and noted in meta.notes.',
+                'BEHAVIOR: Runs on your machine. Order: board-URL parsing -> verified starter list -> the company\'s own website (only for a domain/URL input; robots.txt respected, <= 3 pages, private/internal IPs refused) -> at most 6 GETs against the documented ATS APIs with slug guesses. Stops at the first hit. Nothing is cached or stored. Rate limits: max 2 parallel requests per host, Lever spaced 1 s apart, 15 s timeout per GET; ATS API network errors and HTTP 5xx are retried at most twice with backoff (0.5-1.6 s). Any HTTP 403/429 (or an HTML block page from an ATS API) stops that host for the session (kill switch, never retried, also for the other free tools): the call does not fail but adds a HOST_BLOCKED note to meta.notes, stops the careers-page step when the company site is blocked, and skips later slug probes on a stopped ATS host without sending them.',
                 'COST: No APIFY_TOKEN and no billing; worst case about 4 website requests (robots.txt + 3 pages) and 6 ATS API GETs per call.',
                 'RETURNS: Items of type "board": {ats, slug, company, domain, via (board_url | seed_list | careers_page | slug_probe), confidence (high | medium), board_url}. A slug_probe hit is "medium": the slug exists but may belong to a different company with the same name; check the jobs or pass the URL from the careers page. meta.notes lists robots/blocked/network notes.',
                 'PARAMETERS: company accepts three forms with different behavior: a board URL is parsed with no network call; a domain or https URL enables the careers-page step; a plain name only uses the starter list and slug probes.',
@@ -134,14 +134,18 @@ function createServer(): McpServer {
                 'BEHAVIOR: Greenhouse, Lever: one GET to the documented per-job endpoint; HTTP 404 = closed. Ashby has no per-job endpoint, so the whole board is fetched once and searched for the id (method "board_listing"). "open" means currently published by the employer; it does not prove the role is still being filled.',
                 'COST: Free.',
                 'RETURNS: One item {type:"open_check", ats, slug, job_id, status: open | closed, method: detail_endpoint | board_listing, checked_at, source_url} or an error item (HOST_BLOCKED, NETWORK_ERROR: retryable).',
-                'PARAMETERS: Give either jobKey alone, or ats + slug + jobId; jobKey wins when both are given.',
+                'PARAMETERS: Give either jobKey alone, or ats + slug + jobId; jobKey wins when both are given. A malformed jobKey, or neither form complete, returns INVALID_INPUT without a request.',
                 'EXAMPLE: {"jobKey":"greenhouse:stripe:8172503"} -> {"status":"open","method":"detail_endpoint"}.',
             ].join('\n'),
             inputSchema: {
-                jobKey: z.string().max(250).optional().describe('Optional if ats/slug/jobId are given. The job_key from a job row: "<ats>:<slug>:<job_id>". Example: "lever:palantir:10dfc8bc-99ad-4ca2-ab76-853cb90a92c2"'),
-                ats: atsSchema.optional(),
-                slug: slugSchema.optional(),
-                jobId: z.string().min(1).max(100).optional().describe('Optional if jobKey is given. The ATS job id (job_id field). Example: "8172503"'),
+                jobKey: z.string().max(250).optional().describe('Optional if ats + slug + jobId are given; wins when both are given. The job_key field of a job row, format "{ats}:{slug}:{job_id}" with ats in lowercase (greenhouse | lever | ashby); any other shape returns INVALID_INPUT. Examples: "greenhouse:stripe:8172503", "lever:palantir:10dfc8bc-99ad-4ca2-ab76-853cb90a92c2"'),
+                ats: z.enum(ATS).optional().describe('Required unless jobKey is given. The applicant-tracking system hosting the board: "greenhouse" | "lever" | "ashby" (the first part of job_key). Example: "greenhouse"'),
+                slug: z
+                    .string()
+                    .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/)
+                    .optional()
+                    .describe('Required unless jobKey is given. Board slug from the public board URL (boards.greenhouse.io/{slug}, jobs.lever.co/{slug}, jobs.ashbyhq.com/{slug}; the middle part of job_key), case-insensitive, 1-100 chars: a letter or digit, then letters, digits, ".", "_" or "-". Example: "stripe"'),
+                jobId: z.string().min(1).max(100).optional().describe('Required unless jobKey is given. The ATS job id (job_id field, the last part of job_key), 1-100 chars: numeric on Greenhouse, a UUID on Lever and Ashby. Example: "8172503"'),
             },
             outputSchema: pagedOutputSchema,
             annotations: { title: 'Re-check whether one job is still published (free)', ...READ_ONLY_OPEN_WORLD },
@@ -184,7 +188,7 @@ function createServer(): McpServer {
                 'WHEN NOT: Live job data (jobs_get_board) or companies not in the list (jobs_find_board). The list is a starting point, not a global index of employers.',
                 'BEHAVIOR: Offline: reads a static list compiled into the server; no network call. jobs_at_verification is a snapshot from verified_at and goes stale.',
                 'COST: Free.',
-                'RETURNS: Paged "seed_board" rows with the fields listed under WHAT; meta.by_ats counts boards per ATS.',
+                'RETURNS: Paged "seed_board" rows; meta.by_ats counts the whole list per ATS (unfiltered).',
                 'PARAMETERS: ats narrows the list; omit it for all three systems. Feed ats + slug of any item straight into jobs_get_board.',
                 'EXAMPLE: {"ats":"lever"} -> Palantir, Spotify, Zoox, Ro.',
             ].join('\n'),
@@ -230,10 +234,16 @@ function createServer(): McpServer {
                 titleExcludes: terms('Whole-word title exclusion.', '["intern"]'),
                 locations: terms('Location substring match.', '["london"]'),
                 countries: z.array(z.string().regex(/^[A-Za-z]{2}$/)).max(50).optional().describe('Optional ISO-2 codes, any-of. Example: ["US","GB"]'),
-                remote: z.enum(['any', 'only', 'exclude']).optional().describe('Optional, default "any"'),
+                remote: z
+                    .enum(['any', 'only', 'exclude'])
+                    .optional()
+                    .describe('Optional, "any" | "only" | "exclude", default "any" (no remote filter). "only" keeps job rows with remote = true (an ATS remote flag, or remote wording such as "Remote" or "Anywhere" in the location or title; see remote_basis); "exclude" drops those rows and keeps rows where remote is false or unknown (null)'),
                 departments: terms('Department/team substring match.', '["engineering"]'),
-                postedWithinDays: z.number().int().min(1).max(3650).optional().describe('Optional integer 1-3650 (ATS publish date). Example: 7'),
-                excludeStale: z.boolean().optional().describe('Optional boolean, default false: drop long_open and reposted rows'),
+                postedWithinDays: z.number().int().min(1).max(3650).optional().describe('Optional integer 1-3650, default off: keep only job rows whose ATS publish date (posted_at) is at most this many whole days old; rows without an ATS publish date (posted_at = null) are dropped. Free closed rows are not filtered by it. Example: 7'),
+                excludeStale: z
+                    .boolean()
+                    .optional()
+                    .describe('Optional boolean, default false. true drops job rows with long_open = true (age_days > 60, counted from posted_at, or from first_seen_at when the ATS gives no date) or reposted = true (a new job id matching a job that closed on the same board within 90 days, from the history in stateStoreName, so never on a board\'s first tracked run). Free closed rows are not filtered by it'),
                 onlyNew: z.boolean().optional().describe('Optional boolean, default false: only new/changed jobs since the last tracked run (plus free closed rows)'),
                 stateStoreName: z.string().regex(/^[a-zA-Z0-9-]{3,63}$/).optional().describe('Optional, default "fairquery-jobs-feed-state": named key-value store for history in your Apify account'),
                 confirmOpen: z.boolean().optional().describe('Optional boolean, default false: re-check each emitted job on its detail endpoint ($0.00029 each, max 200 per run)'),

@@ -1,5 +1,12 @@
 # Changelog (@fairquery/company-jobs-feed-mcp)
 
+## 1.0.5 - 2026-10-18
+- Tool descriptions only (no behavior, input, limit or price changes):
+  - `jobs_check_open`: `ats`, `slug` and `jobId` now say "Required unless jobKey is given" (the schema keeps them optional because `jobKey` can replace them) and spell out the formats: `jobKey` = `"{ats}:{slug}:{job_id}"` with lowercase ats, slug charset/length, numeric Greenhouse ids vs. UUIDs on Lever/Ashby; a malformed `jobKey` returns `INVALID_INPUT`.
+  - `jobs_search_companies`: `remote` lists `"any" | "only" | "exclude"` (default `"any"`) and what each keeps; `postedWithinDays` drops rows without an ATS publish date; `excludeStale` defines `long_open` (age > 60 days) and `reposted` (needs history in `stateStoreName`, never on a board's first tracked run). Closed rows are not filtered by either.
+  - `jobs_find_board`: documents the 403/429 kill switch like its siblings: the host is stopped for the session (also for the other free tools), the call adds a `HOST_BLOCKED` note to `meta.notes` instead of failing, and later probes to a stopped host are skipped.
+  - `jobs_get_board`, `jobs_list_seed_boards`: shorter RETURNS sections. Slug/jobKey format placeholders use `{slug}` instead of `<slug>` (some directories strip angle brackets as HTML).
+
 ## 1.0.4 - 2026-10-18
 - Metadata: the Fairquery blog moved to https://getfairquery.com, so `homepage` (npm), `websiteUrl` (MCP Registry), the MCPB manifest author URL, homepage and privacy policy, and the HTTP User-Agent (`FairqueryJobsFeed/1.0 (+https://getfairquery.com; fairquery@proton.me)`) now point there (old fairquery.github.io links 301). No tool, input, limit or price changes.
 - Packaging: `npm run build:mcpb` also builds `<name>-smithery.mcpb` for Smithery uploads. Smithery CLI 1.2.0 passes manifest `tools` straight into an MCP server card, and Smithery's API rejects tools that have no `inputSchema` (`400 Invalid input: expected object, received undefined`, once per tool). The MCPB 0.3 manifest allows only `name`/`description`, so the variant adds each tool's `inputSchema`/`outputSchema`/`annotations` from the server's own `tools/list`, and changes nothing else. `test:mcpb` checks both bundles, the Smithery card (valid MCP Tools, optional `apify_token`), and that the two differ only in those tool schemas.
