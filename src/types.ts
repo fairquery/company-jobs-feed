@@ -17,15 +17,34 @@ export const PRICES_USD = {
     'company-discovered': 0.0019,
 } as const;
 
-export type Ats = 'greenhouse' | 'lever' | 'ashby' | 'smartrecruiters';
-export const ATS_LIST: Ats[] = ['greenhouse', 'lever', 'ashby', 'smartrecruiters'];
+export type Ats = 'greenhouse' | 'lever' | 'ashby';
+/**
+ * Hosts of hiring systems we deliberately do not support. Nothing under these domains is ever fetched,
+ * not even during careers-page discovery (SmartRecruiters' robots.txt disallows non-LinkedIn bots on its API;
+ * Workday, Workable and Recruitee have no public API documented for outside use; LinkedIn is out of scope).
+ */
+export const EXCLUDED_HOST_SUFFIXES = [
+    'smartrecruiters.com',
+    'myworkdayjobs.com',
+    'workday.com',
+    'workable.com',
+    'recruitee.com',
+    'linkedin.com',
+];
+export const EXCLUDED_ATS_NAMES = ['smartrecruiters', 'workday', 'workable', 'recruitee', 'linkedin'];
+
+export function excludedHost(host: string): boolean {
+    const h = host.toLowerCase().replace(/\.$/, '');
+    return EXCLUDED_HOST_SUFFIXES.some((d) => h === d || h.endsWith(`.${d}`));
+}
+
+export const ATS_LIST: Ats[] = ['greenhouse', 'lever', 'ashby'];
 
 /** The only hosts this Actor ever calls for job data. Careers pages are separate (user-supplied, guarded). */
 export const ATS_API_HOSTS: Record<Ats, string> = {
     greenhouse: 'boards-api.greenhouse.io',
     lever: 'api.lever.co',
     ashby: 'api.ashbyhq.com',
-    smartrecruiters: 'api.smartrecruiters.com',
 };
 
 /** Minimum gap between requests per host (ms). Lever's robots.txt sets Crawl-delay: 1. */
@@ -43,7 +62,6 @@ export const DISCOVERY_CACHE_DAYS = 30;
 export const REPOST_WINDOW_DAYS = 90;
 export const CLOSED_RETENTION_DAYS = 120;
 export const MAX_DESCRIPTION_CHARS = 20_000;
-export const SR_PAGE_SIZE = 100;
 
 export const LIMITS = {
     companies: 200,

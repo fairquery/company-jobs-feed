@@ -16,3 +16,4 @@ tsconfig.tsbuildinfo
 test-runs/items_*.json
 mcp/node_modules
 mcp/dist
+test-runs/

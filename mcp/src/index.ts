@@ -20,15 +20,15 @@ import { SEED_BOARDS } from './shared/seed.js';
 import type { Ats } from './shared/types.js';
 
 export const VERSION = '1.0.0';
-const ATS = ['greenhouse', 'lever', 'ashby', 'smartrecruiters'] as const;
+const ATS = ['greenhouse', 'lever', 'ashby'] as const;
 
 const atsSchema = z
     .enum(ATS)
-    .describe('Required. The applicant-tracking system hosting the board: "greenhouse" | "lever" | "ashby" | "smartrecruiters". Example: "ashby"');
+    .describe('Required. The applicant-tracking system hosting the board: "greenhouse" | "lever" | "ashby". Example: "ashby"');
 const slugSchema = z
     .string()
     .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/)
-    .describe('Required. Board slug as it appears in the public board URL (case-insensitive): boards.greenhouse.io/<slug>, jobs.lever.co/<slug>, jobs.ashbyhq.com/<slug>, careers.smartrecruiters.com/<slug>. Example: "ramp" or "BoschGroup"');
+    .describe('Required. Board slug as it appears in the public board URL (case-insensitive): boards.greenhouse.io/<slug>, jobs.lever.co/<slug>, jobs.ashbyhq.com/<slug>. Example: "ramp" or "palantir"');
 const limitSchema = z.number().int().min(1).max(500).optional().describe('Optional page size, integer 1-500, default 50');
 const offsetSchema = z.number().int().min(0).optional().describe('Optional items to skip, integer >= 0, default 0; pass nextOffset from the previous response');
 const terms = (what: string, ex: string) => z.array(z.string().min(1).max(100)).max(50).optional().describe(`Optional, 0-50 strings, any-of. ${what} Example: ${ex}`);
@@ -43,13 +43,13 @@ function createServer(): McpServer {
         {
             title: 'Get live jobs from one ATS board (free)',
             description: [
-                'WHAT: Fetch every job currently published on ONE company board from its official public ATS API (Greenhouse, Lever, Ashby or SmartRecruiters), normalize it and filter it locally.',
+                'WHAT: Fetch every job currently published on ONE company board from its official public ATS API (Greenhouse, Lever or Ashby), normalize it and filter it locally.',
                 'WHEN: You know the board (ats + slug), e.g. from jobs_find_board or a careers-page link, and want its live openings now.',
-                'WHEN NOT: Many companies at once, history (new/closed/reposted since last run), careers-page discovery at scale or descriptions for SmartRecruiters: use jobs_search_companies (paid). Unknown board: use jobs_find_board first. LinkedIn, Workday, Workable and Recruitee are not supported.',
-                'BEHAVIOR: Runs on your machine; one GET (SmartRecruiters: one per 100 postings) to the documented API host only. No token, nothing stored, no history: first_seen_at = now and change = null. Any HTTP 403/429 stops that host for the session (kill switch, HOST_BLOCKED error). Lever requests are spaced 1 s apart (its robots.txt Crawl-delay).',
+                'WHEN NOT: Many companies at once, history (new/closed/reposted since last run), or careers-page discovery at scale: use jobs_search_companies (paid). Unknown board: use jobs_find_board first. SmartRecruiters, LinkedIn, Workday, Workable and Recruitee are not supported and never contacted.',
+                'BEHAVIOR: Runs on your machine; one GET to the documented API host only (very large Greenhouse boards: a second, lighter GET). No token, nothing stored, no history: first_seen_at = now and change = null. Any HTTP 403/429 stops that host for the session (kill switch, HOST_BLOCKED error). Lever requests are spaced 1 s apart (its robots.txt Crawl-delay).',
                 'COST: Free.',
                 'RETURNS: Paged job rows: job_key, title, company, department, team, locations, countries (+country_basis), remote (+remote_basis), workplace_type, employment_type, compensation (only when the ATS publishes it), posted_at (ATS date or null, never guessed), age_days + age_basis, long_open, verified_open_at, apply_url, job_url, source_url, fingerprint. meta: jobs_total on the board, jobs_matched, requests, complete.',
-                'PARAMETERS: All filters are AND-ed; values inside one filter are OR-ed. titleIncludes/titleExcludes match whole words ("engineer" does not match "Engineering"). countries uses the ATS\'s structured country where present (Lever, Ashby, SmartRecruiters) and a place-name list otherwise; rows without any country are dropped when countries is set. postedWithinDays drops rows with posted_at = null. Paging re-fetches the board, so pages from different calls can shift if the employer edits the board in between.',
+                'PARAMETERS: All filters are AND-ed; values inside one filter are OR-ed. titleIncludes/titleExcludes match whole words ("engineer" does not match "Engineering"). countries uses the ATS\'s structured country where present (Lever, Ashby) and a place-name list otherwise; rows without any country are dropped when countries is set. postedWithinDays drops rows with posted_at = null. Paging re-fetches the board, so pages from different calls can shift if the employer edits the board in between.',
                 'EXAMPLE: {"ats":"ashby","slug":"ramp","titleIncludes":["engineer"],"remote":"only"} -> remote engineering roles at Ramp with salary ranges.',
             ].join('\n'),
             inputSchema: {
@@ -62,7 +62,7 @@ function createServer(): McpServer {
                 remote: z.enum(['any', 'only', 'exclude']).optional().describe('Optional, "any" | "only" | "exclude", default "any"'),
                 postedWithinDays: z.number().int().min(1).max(3650).optional().describe('Optional integer 1-3650: keep jobs whose ATS publish date is at most this many days old. Example: 14'),
                 longOpenDays: z.number().int().min(1).max(3650).optional().describe('Optional integer, default 60: rows older than this get long_open = true (a heuristic, not proof of a ghost job)'),
-                includeDescription: z.boolean().optional().describe('Optional boolean, default false. true adds description_text (plain text, <= 20,000 chars, e-mails/phones removed). SmartRecruiters list responses carry no description, so it stays null there'),
+                includeDescription: z.boolean().optional().describe('Optional boolean, default false. true adds description_text (plain text, <= 20,000 chars, e-mails/phones removed)'),
                 limit: limitSchema,
                 offset: offsetSchema,
             },
@@ -95,7 +95,7 @@ function createServer(): McpServer {
         {
             title: 'Find which ATS board a company uses (free)',
             description: [
-                'WHAT: Resolve a company name, domain or careers/board URL to its public job board(s) on Greenhouse, Lever, Ashby or SmartRecruiters.',
+                'WHAT: Resolve a company name, domain or careers/board URL to its public job board(s) on Greenhouse, Lever or Ashby.',
                 'WHEN: Before jobs_get_board when you only know the company ("Ramp", "sentry.io", "https://stripe.com/jobs").',
                 'WHEN NOT: You already have ats + slug (call jobs_get_board). For many companies plus their jobs in one step use jobs_search_companies (paid). It cannot find Workday, Workable, Recruitee or LinkedIn pages.',
                 'BEHAVIOR: Runs on your machine. Order: board-URL parsing -> verified starter list -> the company\'s own website (only for a domain/URL input; robots.txt respected, <= 3 pages, private/internal IPs refused) -> at most 6 GETs against the documented ATS APIs with slug guesses. Stops at the first hit. Nothing is cached or stored.',
@@ -131,7 +131,7 @@ function createServer(): McpServer {
                 'WHAT: Re-check ONE job on the employer\'s ATS right now and report open or closed.',
                 'WHEN: Before applying, alerting or contacting about a specific job you got earlier (job_key or ats + slug + jobId).',
                 'WHEN NOT: Listing jobs (jobs_get_board) or checking many jobs at once (jobs_search_companies with confirmOpen, paid).',
-                'BEHAVIOR: Greenhouse, Lever, SmartRecruiters: one GET to the documented per-job endpoint; HTTP 404 = closed. Ashby has no per-job endpoint, so the whole board is fetched once and searched for the id (method "board_listing"). "open" means currently published by the employer; it does not prove the role is still being filled.',
+                'BEHAVIOR: Greenhouse, Lever: one GET to the documented per-job endpoint; HTTP 404 = closed. Ashby has no per-job endpoint, so the whole board is fetched once and searched for the id (method "board_listing"). "open" means currently published by the employer; it does not prove the role is still being filled.',
                 'COST: Free.',
                 'RETURNS: One item {type:"open_check", ats, slug, job_id, status: open | closed, method: detail_endpoint | board_listing, checked_at, source_url} or an error item (HOST_BLOCKED, NETWORK_ERROR: retryable).',
                 'PARAMETERS: Give either jobKey alone, or ats + slug + jobId; jobKey wins when both are given.',
@@ -151,7 +151,7 @@ function createServer(): McpServer {
             let slug = a.slug;
             let id = a.jobId;
             if (a.jobKey) {
-                const m = /^(greenhouse|lever|ashby|smartrecruiters):([^:]+):(.+)$/.exec(a.jobKey.trim());
+                const m = /^(greenhouse|lever|ashby):([^:]+):(.+)$/.exec(a.jobKey.trim());
                 if (!m) return errorResult('INVALID_INPUT', 'jobKey must look like "<ats>:<slug>:<job_id>".');
                 [, ats, slug, id] = m as unknown as [string, Ats, string, string];
             }
@@ -185,11 +185,11 @@ function createServer(): McpServer {
                 'BEHAVIOR: Offline: reads a static list compiled into the server; no network call. jobs_at_verification is a snapshot from verified_at and goes stale.',
                 'COST: Free.',
                 'RETURNS: Paged items {type:"seed_board", company, domain, ats, slug, verified_at, verified_by, jobs_at_verification}; meta.by_ats counts.',
-                'PARAMETERS: ats narrows the list; omit it for all four systems. Feed ats + slug of any item straight into jobs_get_board.',
+                'PARAMETERS: ats narrows the list; omit it for all three systems. Feed ats + slug of any item straight into jobs_get_board.',
                 'EXAMPLE: {"ats":"lever"} -> Palantir, Spotify, Zoox, Ro.',
             ].join('\n'),
             inputSchema: {
-                ats: z.enum(ATS).optional().describe('Optional filter: "greenhouse" | "lever" | "ashby" | "smartrecruiters"; default all'),
+                ats: z.enum(ATS).optional().describe('Optional filter: "greenhouse" | "lever" | "ashby"; default all'),
                 limit: limitSchema,
                 offset: offsetSchema,
             },
@@ -224,7 +224,7 @@ function createServer(): McpServer {
                     .array(z.object({ ats: atsSchema, slug: slugSchema, company: z.string().max(200).optional().describe('Optional display name') }))
                     .max(500)
                     .optional()
-                    .describe('Optional. 0-500 exact boards. Example: [{"ats":"smartrecruiters","slug":"BoschGroup"}]'),
+                    .describe('Optional. 0-500 exact boards. Example: [{"ats":"lever","slug":"palantir"}]'),
                 useSeedList: z.boolean().optional().describe('Optional boolean, default false: also scan all verified starter boards (each billed as a board)'),
                 titleIncludes: terms('Whole-word title match.', '["engineer"]'),
                 titleExcludes: terms('Whole-word title exclusion.', '["intern"]'),

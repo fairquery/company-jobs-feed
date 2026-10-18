@@ -1,14 +1,7 @@
 import { countriesFromText, countryToIso2 } from './gazetteer.js';
 import { type AtsClient, HttpError } from './http.js';
 import { compact, htmlToText, prettySlug, textSaysRemote, toIso, uniq } from './normalize.js';
-import {
-    type Ats,
-    ATS_API_HOSTS,
-    type Compensation,
-    MAX_DESCRIPTION_CHARS,
-    type NormalizedJob,
-    SR_PAGE_SIZE,
-} from './types.js';
+import { type Ats, ATS_API_HOSTS, type Compensation, MAX_DESCRIPTION_CHARS, type NormalizedJob } from './types.js';
 
 export const SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 
@@ -19,7 +12,11 @@ export function isValidSlug(s: string): boolean {
 const enc = encodeURIComponent;
 const base = (ats: Ats) => `https://${ATS_API_HOSTS[ats]}`;
 
-export function listUrl(ats: Ats, slug: string, opts: { offset?: number; limit?: number; lite?: boolean } = {}): string {
+export function listUrl(
+    ats: Ats,
+    slug: string,
+    opts: { offset?: number; limit?: number; lite?: boolean } = {},
+): string {
     switch (ats) {
         case 'greenhouse':
             return `${base(ats)}/v1/boards/${enc(slug)}/jobs${opts.lite ? '' : '?content=true'}`;
@@ -27,8 +24,6 @@ export function listUrl(ats: Ats, slug: string, opts: { offset?: number; limit?:
             return `${base(ats)}/v0/postings/${enc(slug)}?mode=json${opts.limit ? `&limit=${opts.limit}` : ''}`;
         case 'ashby':
             return `${base(ats)}/posting-api/job-board/${enc(slug)}?includeCompensation=true`;
-        case 'smartrecruiters':
-            return `${base(ats)}/v1/companies/${enc(slug)}/postings?limit=${opts.limit ?? SR_PAGE_SIZE}&offset=${opts.offset ?? 0}`;
         default:
             throw new Error(`unknown ATS ${String(ats)}`);
     }
@@ -41,8 +36,6 @@ export function detailUrl(ats: Ats, slug: string, id: string): string | null {
             return `${base(ats)}/v1/boards/${enc(slug)}/jobs/${enc(id)}`;
         case 'lever':
             return `${base(ats)}/v0/postings/${enc(slug)}/${enc(id)}?mode=json`;
-        case 'smartrecruiters':
-            return `${base(ats)}/v1/companies/${enc(slug)}/postings/${enc(id)}`;
         default:
             return null;
     }
@@ -106,13 +99,6 @@ function withCountries(job: Omit<NormalizedJob, 'countries' | 'country_basis'>, 
 function workplace(wt: string, remoteFallback: boolean | null): NormalizedJob['workplace_type'] {
     if (wt === 'remote' || wt === 'hybrid' || wt === 'onsite') return wt;
     return remoteFallback ? 'remote' : null;
-}
-
-function srWorkplace(l: { remote?: boolean; hybrid?: boolean }): string {
-    if (l.remote) return 'remote';
-    if (l.hybrid) return 'hybrid';
-    if (l.remote === false) return 'onsite';
-    return '';
 }
 
 // ---------------- Greenhouse ----------------
@@ -340,130 +326,9 @@ export function mapAshby(slug: string, j: AshbyJob, company: string, withDescrip
     );
 }
 
-// ---------------- SmartRecruiters ----------------
-interface SrJob {
-    id: string;
-    name: string;
-    releasedDate?: string;
-    company?: { identifier?: string; name?: string };
-    location?: {
-        city?: string;
-        region?: string;
-        country?: string;
-        remote?: boolean;
-        hybrid?: boolean;
-        fullLocation?: string;
-    };
-    department?: { label?: string };
-    function?: { label?: string };
-    typeOfEmployment?: { label?: string };
-    ref?: string;
-}
-
-export function mapSmartRecruiters(slug: string, j: SrJob, company: string): NormalizedJob {
-    const l = j.location ?? {};
-    const loc =
-        str(l.fullLocation) ?? compact([l.city ?? null, l.region ?? null, l.country?.toUpperCase() ?? null]).join(', ');
-    const locations = loc ? [loc] : [];
-    const remote = typeof l.remote === 'boolean' ? l.remote : null;
-    const ident = j.company?.identifier ?? slug;
-    return withCountries(
-        {
-            ats: 'smartrecruiters',
-            board: slug,
-            company: str(j.company?.name) ?? company,
-            job_id: String(j.id),
-            title: (j.name ?? '').trim(),
-            department: str(j.department?.label),
-            team: str(j.function?.label),
-            locations,
-            remote,
-            remote_basis: remote === null ? null : 'ats',
-            workplace_type: workplace(srWorkplace(l), null),
-            employment_type: str(j.typeOfEmployment?.label),
-            compensation: null,
-            posted_at: toIso(j.releasedDate),
-            ats_updated_at: null,
-            apply_url: `https://jobs.smartrecruiters.com/${enc(ident)}/${enc(String(j.id))}`,
-            job_url: `https://jobs.smartrecruiters.com/${enc(ident)}/${enc(String(j.id))}`,
-            description_text: null,
-            detail_url: detailUrl('smartrecruiters', slug, String(j.id)),
-        },
-        compact([l.country ?? null]),
-    );
-}
-
-/** Text from a SmartRecruiters posting detail (jobAd.sections). */
-export function srDetailDescription(detail: unknown): string | null {
-    const sections = (detail as { jobAd?: { sections?: Record<string, { title?: string; text?: string }> } })?.jobAd
-        ?.sections;
-    if (!sections) return null;
-    const parts: string[] = [];
-    for (const s of Object.values(sections)) {
-        const t = htmlToText(s?.text);
-        if (t) parts.push(s?.title ? `${s.title}\n${t}` : t);
-    }
-    return clip(parts.join('\n\n') || null);
-}
-
 // ---------------- board fetch ----------------
 export async function fetchBoard(client: AtsClient, ats: Ats, slug: string, o: FetchOpts): Promise<BoardFetch> {
     const hint = o.companyHint ?? prettySlug(slug);
-    if (ats === 'smartrecruiters') {
-        const jobs: NormalizedJob[] = [];
-        let total = 0;
-        let offset = 0;
-        let requests = 0;
-        let company: string | null = null;
-        const first = listUrl(ats, slug);
-        for (;;) {
-            const r = await client.getJson<{ totalFound?: number; content?: SrJob[] }>(listUrl(ats, slug, { offset }));
-            requests++;
-            if (r.status === 404 || !r.json)
-                return {
-                    company: null,
-                    jobs: [],
-                    total: 0,
-                    complete: false,
-                    sourceUrl: first,
-                    requests,
-                    notFound: true,
-                };
-            total = r.json.totalFound ?? 0;
-            const page = r.json.content ?? [];
-            if (requests === 1 && total === 0) {
-                // SmartRecruiters answers 200 + totalFound 0 for unknown company ids, so 0 is "not found or empty".
-                return {
-                    company: null,
-                    jobs: [],
-                    total: 0,
-                    complete: true,
-                    sourceUrl: first,
-                    requests,
-                    notFound: true,
-                };
-            }
-            for (const j of page) {
-                company ??= str(j.company?.name);
-                jobs.push(mapSmartRecruiters(slug, j, hint));
-            }
-            offset += page.length;
-            if (!page.length || offset >= total) break;
-            if (jobs.length >= o.maxJobs || o.shouldStop?.()) {
-                return {
-                    company,
-                    jobs: jobs.slice(0, o.maxJobs),
-                    total,
-                    complete: false,
-                    sourceUrl: first,
-                    requests,
-                    notFound: false,
-                };
-            }
-        }
-        return { company, jobs, total, complete: jobs.length >= total, sourceUrl: first, requests, notFound: false };
-    }
-
     let url = listUrl(ats, slug);
     let note: string | undefined;
     let requests = 1;
@@ -477,7 +342,8 @@ export async function fetchBoard(client: AtsClient, ats: Ats, slug: string, o: F
         url = listUrl(ats, slug, { lite: true });
         r = await client.getJson<unknown>(url);
         requests = 2;
-        note = 'greenhouse_list_without_content: board too large for content=true, so department, offices and description are missing';
+        note =
+            'greenhouse_list_without_content: board too large for content=true, so department, offices and description are missing';
     }
     if (r.status === 404 || r.json === null) {
         return { company: null, jobs: [], total: 0, complete: false, sourceUrl: url, requests: 1, notFound: true };
@@ -532,10 +398,6 @@ export async function probeBoard(
     const r = await client.getJson<unknown>(url);
     if (r.status !== 200 || r.json === null) return { found: false, company: null, url };
     if (ats === 'greenhouse') return { found: true, company: str((r.json as { name?: string }).name), url };
-    if (ats === 'smartrecruiters') {
-        const j = r.json as { totalFound?: number; content?: SrJob[] };
-        return { found: (j.totalFound ?? 0) > 0, company: str(j.content?.[0]?.company?.name), url };
-    }
     if (ats === 'lever') return { found: Array.isArray(r.json), company: null, url };
     return { found: Array.isArray((r.json as { jobs?: unknown[] }).jobs), company: null, url };
 }

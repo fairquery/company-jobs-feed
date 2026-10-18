@@ -3,7 +3,15 @@ import { isValidSlug, probeBoard } from './ats.js';
 import { type AtsClient, type CareersFetcher, HttpError } from './http.js';
 import { normText } from './normalize.js';
 import { SEED_BOARDS, type SeedBoard } from './seed.js';
-import { type Ats, ATS_API_HOSTS, ATS_LIST, MAX_CAREERS_PAGES_PER_DOMAIN, MAX_PROBES_PER_COMPANY } from './types.js';
+import {
+    type Ats,
+    ATS_API_HOSTS,
+    ATS_LIST,
+    EXCLUDED_ATS_NAMES,
+    excludedHost,
+    MAX_CAREERS_PAGES_PER_DOMAIN,
+    MAX_PROBES_PER_COMPANY,
+} from './types.js';
 
 export interface FoundBoard {
     ats: Ats;
@@ -12,10 +20,24 @@ export interface FoundBoard {
     confidence: 'high' | 'medium';
 }
 
+/** Name of an unsupported hiring system if the input points at one ("smartrecruiters:acme", a Workday URL, ...). */
+export function unsupportedAts(raw: string): string | null {
+    const s = raw.trim();
+    const m = new RegExp(`^(${EXCLUDED_ATS_NAMES.join('|')})\\s*[:/]`, 'i').exec(s);
+    if (m) return m[1].toLowerCase();
+    try {
+        const u = new URL(/^[a-z]+:\/\//i.test(s) ? s : `https://${s}`);
+        if (excludedHost(u.hostname)) return u.hostname.toLowerCase();
+    } catch {
+        /* not a URL */
+    }
+    return null;
+}
+
 /** Board-URL patterns on the ATS's own public hosts. Returns null when the string isn't a board URL. */
 export function parseBoardUrl(raw: string): { ats: Ats; slug: string } | null {
     const s = raw.trim();
-    const m = /^(greenhouse|lever|ashby|smartrecruiters)\s*[:/]\s*([A-Za-z0-9._-]+)$/i.exec(s);
+    const m = /^(greenhouse|lever|ashby)\s*[:/]\s*([A-Za-z0-9._-]+)$/i.exec(s);
     if (m) return checked(m[1].toLowerCase() as Ats, m[2]);
     let u: URL;
     try {
@@ -38,10 +60,6 @@ export function parseBoardUrl(raw: string): { ats: Ats; slug: string } | null {
     if (host === 'jobs.ashbyhq.com' && seg[0] && seg[0] !== 'api') return checked('ashby', seg[0]);
     if (host === 'api.ashbyhq.com' && seg[0] === 'posting-api' && seg[1] === 'job-board' && seg[2])
         return checked('ashby', seg[2]);
-    if ((host === 'careers.smartrecruiters.com' || host === 'jobs.smartrecruiters.com') && seg[0])
-        return checked('smartrecruiters', seg[0]);
-    if (host === 'api.smartrecruiters.com' && seg[0] === 'v1' && seg[1] === 'companies' && seg[2])
-        return checked('smartrecruiters', seg[2]);
     return null;
 }
 
@@ -59,7 +77,7 @@ function safeDecode(s: string): string {
 }
 
 const LINK_RE =
-    /https?:(?:\/\/|\\\/\\\/)(?:boards|job-boards)\.greenhouse\.io[^\s"'<>)]*|https?:\/\/(?:jobs\.lever\.co|jobs\.ashbyhq\.com|(?:careers|jobs)\.smartrecruiters\.com)\/[^\s"'<>)]*/gi;
+    /https?:(?:\/\/|\\\/\\\/)(?:boards|job-boards)\.greenhouse\.io[^\s"'<>)]*|https?:\/\/(?:jobs\.lever\.co|jobs\.ashbyhq\.com)\/[^\s"'<>)]*/gi;
 
 /** ATS board links or embeds that a company publishes on its own careers page. */
 export function extractBoardLinks(html: string): { ats: Ats; slug: string }[] {
@@ -196,6 +214,7 @@ export async function discoverCompany(
         }
     };
 
+    if (unsupportedAts(input)) return out; // never contact excluded hiring systems, not even their websites
     if (out.domain) {
         const site = registrableDomain(out.domain);
         const queue: string[] = [];

@@ -1,4 +1,4 @@
-# Company Jobs Feed: live jobs from Greenhouse, Lever, Ashby & SmartRecruiters (Apify Actor + MCP server)
+# Company Jobs Feed: live jobs from Greenhouse, Lever & Ashby (Apify Actor + MCP server)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
@@ -16,38 +16,33 @@ Live job listings read **straight from employers' own applicant-tracking systems
 | Greenhouse | `boards-api.greenhouse.io/v1/boards/{slug}/jobs` (Job Board API) | Yes |
 | Lever | `api.lever.co/v0/postings/{slug}` (Postings API) | Yes |
 | Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` (public Job Postings API) | Yes |
-| SmartRecruiters | `api.smartrecruiters.com/v1/companies/{id}/postings` (Posting API) | Yes |
+| SmartRecruiters | its API host's robots.txt allows only LinkedIn's crawler | No (never contacted) |
 | Recruitee | Careers Site API needs an employer token | No |
 | Workable | public endpoints are documented only for the account's own careers page | No |
 | Workday | no public job API | No |
 | LinkedIn | not contacted at all | No |
 
-Company names, domains and careers URLs can be resolved to boards (careers-page links with robots.txt respected, then at most 6 slug probes against the APIs). 59 verified starter boards ship in [`src/seed.ts`](./src/seed.ts).
+Company names, domains and careers URLs can be resolved to boards (careers-page links with robots.txt respected, then at most 6 slug probes against the APIs). 51 verified starter boards ship in [`src/seed.ts`](./src/seed.ts).
 
 ## MCP server
 
 ### Install
 
-Requires Node.js 20+.
-
-```bash
-git clone https://github.com/fairquery/company-jobs-feed
-cd company-jobs-feed/mcp && npm ci --ignore-scripts && npm run build
-```
-
-Claude Desktop / Cursor / VS Code (`mcpServers` config):
+Requires Node.js 20+. From npm: [`@fairquery/company-jobs-feed-mcp`](https://www.npmjs.com/package/@fairquery/company-jobs-feed-mcp). Claude Desktop / Cursor / VS Code (`mcpServers` config):
 
 ```json
 {
   "mcpServers": {
     "fairquery-jobs-feed": {
-      "command": "node",
-      "args": ["/path/to/company-jobs-feed/mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@fairquery/company-jobs-feed-mcp"],
       "env": { "APIFY_TOKEN": "<only needed for jobs_search_companies>" }
     }
   }
 }
 ```
+
+From source: `git clone https://github.com/fairquery/company-jobs-feed && cd company-jobs-feed/mcp && npm ci --ignore-scripts && npm run build && node dist/index.js`.
 
 Docker: `docker build -t fairquery-jobs-feed-mcp . && docker run -i --rm fairquery-jobs-feed-mcp`.
 
@@ -56,7 +51,7 @@ Docker: `docker build -t fairquery-jobs-feed-mcp . && docker run -i --rm fairque
 | Tool | Cost | What it does |
 | --- | --- | --- |
 | `jobs_get_board` | free, local | All jobs currently published on one board (ats + slug), normalized and filtered by title, location, country, remote and posted-within. Returns `posted_at`, `age_days`, `long_open`, `verified_open_at`, apply URL |
-| `jobs_find_board` | free, local | Resolve a company name, domain or careers URL to its Greenhouse/Lever/Ashby/SmartRecruiters board, with `via` and `confidence` |
+| `jobs_find_board` | free, local | Resolve a company name, domain or careers URL to its Greenhouse/Lever/Ashby board, with `via` and `confidence` |
 | `jobs_check_open` | free, local | Re-check one job right now: `open` or `closed` (detail endpoint; Ashby via the board listing) |
 | `jobs_list_seed_boards` | free, offline | The verified starter boards (company, domain, ats, slug, verified_at) |
 | `jobs_search_companies` | paid (Apify PPE) | Many companies at once with discovery, history (first/last seen, new/updated/closed), repost detection, optional re-checks and descriptions. Needs `APIFY_TOKEN` |
@@ -75,8 +70,8 @@ curl -X POST "https://api.apify.com/v2/acts/fairquery~company-jobs-feed/run-sync
 import { ApifyClient } from 'apify-client';
 const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
 const run = await client.actor('fairquery/company-jobs-feed').call({
-    boards: [{ ats: 'smartrecruiters', slug: 'BoschGroup' }],
-    countries: ['DE'], titleIncludes: ['software'], postedWithinDays: 14,
+    companies: ['https://jobs.lever.co/palantir'],
+    countries: ['US'], titleIncludes: ['engineer'], postedWithinDays: 180,
 });
 const { items } = await client.dataset(run.defaultDatasetId).listItems();
 ```
@@ -102,7 +97,7 @@ Real row from a test run on 2026-10-17 (Ramp, Ashby; abbreviated):
 
 ## Politeness and security
 
-Only the four documented API hosts are called (HTTPS, no redirects). Careers pages are read only for domains you supply, with robots.txt (RFC 9309), SSRF protection (private IPs refused, DNS pinned) and a 3-page cap. Any 403/429 stops that host for the run. No login, no proxies, no evasion. See [SECURITY.md](./SECURITY.md).
+Only the three documented API hosts are called (HTTPS, no redirects). Careers pages are read only for domains you supply, with robots.txt (RFC 9309), SSRF protection (private IPs refused, DNS pinned) and a 3-page cap. Any 403/429 stops that host for the run. No login, no proxies, no evasion. See [SECURITY.md](./SECURITY.md).
 
 ## Development
 
@@ -114,4 +109,4 @@ Other Fairquery Actors: https://apify.com/fairquery. One MCP server for several 
 
 ## License
 
-MIT © 2026 Fairquery. Job data belongs to the employers. Not affiliated with Greenhouse, Lever, Ashby, SmartRecruiters or LinkedIn.
+MIT © 2026 Fairquery. Job data belongs to the employers. Not affiliated with Greenhouse, Lever, Ashby or LinkedIn.

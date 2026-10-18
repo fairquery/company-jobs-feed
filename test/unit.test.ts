@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fetchBoard, listUrl, mapAshby, mapGreenhouse, mapLever, mapSmartRecruiters } from '../src/ats.js';
+import { fetchBoard, listUrl, mapAshby, mapGreenhouse, mapLever } from '../src/ats.js';
 import { DuplicateTracker, mergeRoles } from '../src/dedupe.js';
 import {
     extractBoardLinks,
@@ -75,10 +75,8 @@ describe('board URL parsing and discovery helpers', () => {
         });
         expect(parseBoardUrl('https://jobs.lever.co/palantir/abc-123')).toEqual({ ats: 'lever', slug: 'palantir' });
         expect(parseBoardUrl('jobs.ashbyhq.com/ramp')).toEqual({ ats: 'ashby', slug: 'ramp' });
-        expect(parseBoardUrl('https://careers.smartrecruiters.com/BoschGroup')).toEqual({
-            ats: 'smartrecruiters',
-            slug: 'BoschGroup',
-        });
+        expect(parseBoardUrl('https://careers.smartrecruiters.com/BoschGroup')).toBeNull();
+        expect(parseBoardUrl('smartrecruiters:BoschGroup')).toBeNull();
         expect(parseBoardUrl('ashby:ramp')).toEqual({ ats: 'ashby', slug: 'ramp' });
         expect(parseBoardUrl('https://www.linkedin.com/jobs/view/123')).toBeNull();
         expect(parseBoardUrl('https://acme.wd5.myworkdayjobs.com/en-US/careers')).toBeNull();
@@ -116,7 +114,7 @@ describe('board URL parsing and discovery helpers', () => {
         expect(seedLookup('stripe.com')[0]).toMatchObject({ ats: 'greenhouse', slug: 'stripe' });
         expect(seedLookup('Ramp')[0]).toMatchObject({ ats: 'ashby', slug: 'ramp' });
         for (const s of SEED_BOARDS) {
-            expect(['greenhouse', 'lever', 'ashby', 'smartrecruiters']).toContain(s.ats);
+            expect(['greenhouse', 'lever', 'ashby']).toContain(s.ats);
             expect(s.jobs_at_verification).toBeGreaterThan(0);
             expect(s.verified_at).toMatch(/^\d{4}-\d{2}-\d{2}$/);
         }
@@ -160,7 +158,7 @@ describe('SSRF guard', () => {
         await expect(f.getPage('https://acme.com/')).rejects.toMatchObject({ code: 'URL_NOT_ALLOWED' });
     });
 
-    it('ATS client only calls the four documented API hosts', async () => {
+    it('ATS client only calls the three documented API hosts', async () => {
         const c = new AtsClient(
             new HostGate(),
             fakeFetch(() => ({ status: 200, body: {} })),
@@ -350,52 +348,30 @@ describe('ATS mappers (fields confirmed against live responses 2026-10-17)', () 
         expect(j.detail_url).toBeNull();
     });
 
-    it('SmartRecruiters: releasedDate, structured country and remote', () => {
-        const j = mapSmartRecruiters(
-            'BoschGroup',
-            {
-                id: '744000156094999',
-                name: 'Janitor',
-                releasedDate: '2026-10-17T00:08:21.966Z',
-                company: { identifier: 'BoschGroup', name: 'Bosch Group' },
-                location: {
-                    city: 'Mexicali',
-                    country: 'mx',
-                    remote: false,
-                    hybrid: false,
-                    fullLocation: 'Mexicali, BAJA CALIFORNIA, Mexico',
-                },
-                typeOfEmployment: { label: 'Full-time' },
-            },
-            'Bosch',
-        );
-        expect(j).toMatchObject({
-            company: 'Bosch Group',
-            countries: ['MX'],
-            remote: false,
-            remote_basis: 'ats',
-            workplace_type: 'onsite',
-            posted_at: '2026-10-17T00:08:21.966Z',
-        });
-    });
-
-    it('SmartRecruiters pagination stops at totalFound and flags truncation', async () => {
+    it('SmartRecruiters, Workday, Workable, Recruitee and LinkedIn are never contacted', async () => {
+        const { unsupportedAts } = await import('../src/discovery.js');
+        const { excludedHost, ATS_API_HOSTS } = await import('../src/types.js');
+        expect(Object.values(ATS_API_HOSTS)).toEqual(['boards-api.greenhouse.io', 'api.lever.co', 'api.ashbyhq.com']);
+        expect(unsupportedAts('https://careers.smartrecruiters.com/BoschGroup')).toBe('careers.smartrecruiters.com');
+        expect(unsupportedAts('smartrecruiters:BoschGroup')).toBe('smartrecruiters');
+        expect(unsupportedAts('acme.wd5.myworkdayjobs.com')).toBe('acme.wd5.myworkdayjobs.com');
+        expect(unsupportedAts('stripe.com')).toBeNull();
+        expect(excludedHost('API.SmartRecruiters.com.')).toBe(true);
+        expect(excludedHost('notsmartrecruiters.com')).toBe(false);
+        let calls = 0;
         const c = new AtsClient(
             new HostGate(),
-            fakeFetch((u) => {
-                const offset = Number(new URL(u).searchParams.get('offset'));
-                const content = Array.from({ length: offset < 200 ? 100 : 50 }, (_, i) => ({
-                    id: String(offset + i),
-                    name: 'Job',
-                }));
-                return { status: 200, body: { totalFound: 250, content } };
+            fakeFetch(() => {
+                calls++;
+                return { status: 200, body: {} };
             }),
         );
-        const all = await fetchBoard(c, 'smartrecruiters', 'X', { maxJobs: 1000, withDescription: false });
-        expect(all).toMatchObject({ total: 250, complete: true, requests: 3 });
-        expect(all.jobs).toHaveLength(250);
-        const capped = await fetchBoard(c, 'smartrecruiters', 'X', { maxJobs: 100, withDescription: false });
-        expect(capped).toMatchObject({ complete: false, requests: 1 });
+        await expect(c.getJson('https://api.smartrecruiters.com/v1/companies/BoschGroup/postings')).rejects.toThrow();
+        const cf = new CareersFetcher(new HostGate());
+        await expect(cf.getPage('https://careers.smartrecruiters.com/BoschGroup')).rejects.toMatchObject({
+            code: 'UNSUPPORTED_ATS',
+        });
+        expect(calls).toBe(0);
     });
 });
 
@@ -582,6 +558,6 @@ describe('prettySlug', () => {
         const { prettySlug } = await import('../src/normalize.js');
         expect(prettySlug('sentry')).toBe('Sentry');
         expect(prettySlug('scale-ai')).toBe('Scale Ai');
-        expect(prettySlug('BoschGroup')).toBe('BoschGroup');
+        expect(prettySlug('OpenAI')).toBe('OpenAI');
     });
 });

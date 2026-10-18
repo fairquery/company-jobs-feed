@@ -8,6 +8,7 @@ import { isAllowed, parseRobots, type Robots } from './robots.js';
 import { isPrivateAddress, unsafeUrlReason } from './ssrf.js';
 import {
     ATS_API_HOSTS,
+    excludedHost,
     HOST_CONCURRENCY,
     HOST_MIN_INTERVAL_MS,
     MAX_HTML_BYTES,
@@ -116,7 +117,7 @@ export interface JsonResult<T> {
 
 const API_HOSTS = new Set(Object.values(ATS_API_HOSTS));
 
-/** Client for the four documented ATS API hosts only. Any other host is refused (no SSRF). */
+/** Client for the three documented ATS API hosts only. Any other host is refused (no SSRF). */
 export class AtsClient {
     constructor(
         readonly gate: HostGate,
@@ -248,6 +249,12 @@ export class CareersFetcher {
     async resolvePublic(u: URL): Promise<{ address: string; family: number }> {
         const reason = unsafeUrlReason(u);
         if (reason) throw new HttpError(`${u.hostname}: ${reason}`, 'URL_NOT_ALLOWED', false);
+        if (excludedHost(u.hostname))
+            throw new HttpError(
+                `${u.hostname} belongs to an unsupported hiring system; never fetched`,
+                'UNSUPPORTED_ATS',
+                false,
+            );
         let addrs: { address: string; family: number }[];
         try {
             addrs = await this.resolver(u.hostname);
@@ -307,6 +314,12 @@ export class CareersFetcher {
     async getPage(url: string, maxHops = 3): Promise<PageResult> {
         let u = new URL(url);
         for (let hop = 0; hop <= maxHops; hop++) {
+            if (excludedHost(u.hostname))
+                throw new HttpError(
+                    `${u.hostname} belongs to an unsupported hiring system; never fetched`,
+                    'UNSUPPORTED_ATS',
+                    false,
+                );
             if (!(await this.robotsAllows(u))) {
                 throw new HttpError(`robots.txt on ${u.hostname} disallows ${u.pathname}`, 'ROBOTS_DISALLOWED', false);
             }

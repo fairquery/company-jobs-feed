@@ -29,7 +29,7 @@
             "ats": {
                 "type": "string",
                 "title": "ATS",
-                "description": "greenhouse, lever, ashby or smartrecruiters."
+                "description": "greenhouse, lever or ashby."
             },
             "board": {
                 "type": "string",

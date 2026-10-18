@@ -1,7 +1,7 @@
 {
     "$schema": "https://apify.com/schemas/v1/input.ide.json",
     "title": "Company Jobs Feed",
-    "description": "Live, open jobs from companies' own hiring systems (Greenhouse, Lever, Ashby, SmartRecruiters) via their official public job-board APIs. Give companies (names, domains or board URLs) and/or explicit boards, or search the verified starter list.",
+    "description": "Live, open jobs from companies' own hiring systems (Greenhouse, Lever, Ashby) via their official public job-board APIs. Give companies (names, domains or board URLs) and/or explicit boards, or search the verified starter list.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
@@ -18,17 +18,16 @@
             "title": "Boards (explicit)",
             "type": "array",
             "editor": "json",
-            "description": "Exact boards: [{\"ats\":\"greenhouse|lever|ashby|smartrecruiters\",\"slug\":\"...\"}], or strings like \"ashby:ramp\" or board URLs. Optional company/domain per board. Max 500.",
+            "description": "Exact boards: [{\"ats\":\"greenhouse|lever|ashby\",\"slug\":\"...\"}], or strings like \"ashby:ramp\" or board URLs. Optional company/domain per board. Max 500.",
             "prefill": [{ "ats": "ashby", "slug": "ramp" }],
             "example": [
-                { "ats": "greenhouse", "slug": "stripe" },
-                { "ats": "smartrecruiters", "slug": "BoschGroup", "company": "Bosch" }
+                { "ats": "greenhouse", "slug": "stripe" }
             ]
         },
         "useSeedList": {
             "title": "Scan the verified starter list",
             "type": "boolean",
-            "description": "Add every board from the shipped starter list (59 verified company boards) so you can search them without bringing your own list. Each board is billed as one board scanned.",
+            "description": "Add every board from the shipped starter list (51 verified company boards) so you can search them without bringing your own list. Each board is billed as one board scanned.",
             "default": false
         },
         "discover": {
@@ -68,7 +67,7 @@
             "title": "Countries (ISO-2, any)",
             "type": "array",
             "editor": "stringList",
-            "description": "ISO-2 codes like US, DE, GB. Uses the ATS's structured country where it has one (Lever, Ashby, SmartRecruiters), otherwise a small place-name list on the location text (country_basis says which). Jobs with no country information are dropped when this is set."
+            "description": "ISO-2 codes like US, DE, GB. Uses the ATS's structured country where it has one (Lever, Ashby), otherwise a small place-name list on the location text (country_basis says which). Jobs with no country information are dropped when this is set."
         },
         "remote": {
             "title": "Remote",
@@ -177,7 +176,7 @@
             "title": "Description",
             "type": "string",
             "editor": "select",
-            "description": "text = plain-text job description (up to 20,000 characters). SmartRecruiters descriptions need 'Re-check each job' because its list endpoint has none.",
+            "description": "text = plain-text job description (up to 20,000 characters).",
             "enum": ["none", "text"],
             "enumTitles": ["None", "Plain text"],
             "default": "none"
@@ -192,7 +191,7 @@
             "title": "Re-check each job (detail endpoint)",
             "type": "string",
             "editor": "select",
-            "description": "detail = re-fetch each emitted job from the ATS's documented per-job endpoint (Greenhouse, Lever, SmartRecruiters; Ashby has none). A 404 marks it closed. $0.00029 per re-check; off by default because the board listing is already the employer's live list.",
+            "description": "detail = re-fetch each emitted job from the ATS's documented per-job endpoint (Greenhouse, Lever; Ashby has none). A 404 marks it closed. $0.00029 per re-check; off by default because the board listing is already the employer's live list.",
             "enum": ["none", "detail"],
             "enumTitles": ["Off", "Re-check via detail endpoint"],
             "default": "none"
@@ -217,7 +216,7 @@
         "maxJobsPerBoard": {
             "title": "Max jobs read per board",
             "type": "integer",
-            "description": "Safety cap on postings read from one board (SmartRecruiters pages 100 at a time). A truncated board skips closed detection.",
+            "description": "Safety cap on postings read from one board. A truncated board skips closed detection.",
             "default": 10000,
             "minimum": 1,
             "maximum": 20000

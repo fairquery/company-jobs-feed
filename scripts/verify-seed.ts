@@ -1,6 +1,6 @@
 /**
- * Re-verify the starter list against the live official ATS APIs (one list request per board,
- * SmartRecruiters paged). Prints a table and exits 1 if any board is missing or empty.
+ * Re-verify the starter list against the live official ATS APIs (one list request per board).
+ * Prints a table and exits 1 if any board is missing or empty.
  * Usage: npm run verify-seed
  */
 import { fetchBoard } from '../src/ats.js';

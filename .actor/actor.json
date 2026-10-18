@@ -2,7 +2,7 @@
     "$schema": "https://apify.com/schemas/v1/actor.ide.json",
     "actorSpecification": 1,
     "name": "company-jobs-feed",
-    "title": "Company Jobs Feed: Greenhouse, Lever, Ashby & SmartRecruiters",
+    "title": "Company Jobs Feed: Greenhouse, Lever & Ashby",
     "description": "Live, open jobs straight from companies' own hiring systems via official public ATS APIs (no login, no proxies). Every row says when we verified it open, its age and repost signals. Filters, change tracking, de-dup. $0.99 per 1,000 jobs.",
     "version": "1.0",
     "buildTag": "latest",

@@ -1,12 +1,17 @@
 {
-  "name": "fairquery-jobs-feed-mcp",
+  "name": "@fairquery/company-jobs-feed-mcp",
   "version": "1.0.0",
-  "description": "stdio MCP server for Fairquery Company Jobs Feed: live jobs from Greenhouse, Lever, Ashby and SmartRecruiters official public APIs (free local tools + paid Apify Actor tool).",
+  "mcpName": "io.github.fairquery/company-jobs-feed-mcp",
+  "description": "stdio MCP server for Fairquery Company Jobs Feed: live jobs from Greenhouse, Lever and Ashby official public APIs (free local tools + paid Apify Actor tool).",
   "type": "module",
   "bin": {
-    "fairquery-jobs-feed-mcp": "./dist/index.js"
+    "company-jobs-feed-mcp": "./dist/index.js"
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "sync": "node scripts/sync-shared.mjs",
     "sync:check": "node scripts/sync-shared.mjs --check",
@@ -14,7 +19,8 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "smoke": "node scripts/smoke-test.mjs",
-    "test": "node scripts/sync-shared.mjs --check && node scripts/smoke-test.mjs"
+    "test": "node scripts/sync-shared.mjs --check && node scripts/smoke-test.mjs",
+    "prepublishOnly": "npm run build && npm test"
   },
   "engines": {
     "node": ">=20"
@@ -30,6 +36,25 @@
   },
   "author": "Fairquery <fairquery@proton.me>",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/fairquery/company-jobs-feed" },
-  "keywords": ["mcp", "jobs", "greenhouse", "lever", "ashby", "smartrecruiters", "job-board-api", "ats"]
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fairquery/company-jobs-feed.git",
+    "directory": "mcp"
+  },
+  "keywords": [
+    "mcp",
+    "jobs",
+    "greenhouse",
+    "lever",
+    "ashby",
+    "job-board-api",
+    "ats"
+  ],
+  "homepage": "https://github.com/fairquery/company-jobs-feed/tree/main/mcp#readme",
+  "bugs": {
+    "url": "https://github.com/fairquery/company-jobs-feed/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

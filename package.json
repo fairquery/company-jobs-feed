@@ -2,7 +2,7 @@
     "name": "company-jobs-feed",
     "version": "1.0.0",
     "type": "module",
-    "description": "Live, open jobs from companies' own hiring systems (Greenhouse, Lever, Ashby, SmartRecruiters) via their official public job-board APIs, with freshness, age and repost signals (Fairquery).",
+    "description": "Live, open jobs from companies' own hiring systems (Greenhouse, Lever, Ashby) via their official public job-board APIs, with freshness, age and repost signals (Fairquery).",
     "engines": {
         "node": ">=20"
     },

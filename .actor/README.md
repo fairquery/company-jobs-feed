@@ -1,8 +1,8 @@
-# Company Jobs Feed: Greenhouse, Lever, Ashby & SmartRecruiters
+# Company Jobs Feed: Greenhouse, Lever & Ashby
 
-**Live, open jobs straight from companies' own hiring systems, for $0.99 per 1,000 jobs plus $0.0005 per board scanned.** Optional extras: $0.00029 per job re-check and $0.0019 per company whose board we had to discover. Error rows, closed-job rows and rows merged by de-duplication are free. Example: Stripe + Ramp + Palantir (3 boards) filtered to 300 engineering jobs costs 300 × $0.00099 + 3 × $0.0005 = **$0.30**, plus Apify's $0.00005 Actor-start fee.
+**Live, open jobs straight from companies' own hiring systems, for $0.99 per 1,000 jobs plus $0.0005 per board scanned.** Optional extras: $0.00029 per job re-check and $0.0019 per company whose board we had to discover. Error rows, closed-job rows and rows merged by de-duplication are free. Example: Stripe + Ramp + Palantir (3 boards) filtered to 300 engineering jobs costs 300 × $0.00099 + 3 × $0.0005 = **$0.30**.
 
-**Fairquery** Apify Actor that reads the **official public job-board APIs** of Greenhouse, Lever, Ashby and SmartRecruiters (the applicant-tracking systems, or ATSs, that companies publish their openings from) and returns one clean row per job. Every row says **when we verified it as currently published** (`verified_open_at`), when the ATS says it was posted, **how old it is**, whether it looks **long-open** or **reposted**, and the exact API URL it came from. No login, no proxies, no browser.
+**Fairquery** Apify Actor that reads the **official public job-board APIs** of Greenhouse, Lever and Ashby (the applicant-tracking systems, or ATSs, that companies publish their openings from) and returns one clean row per job. Every row says **when we verified it as currently published** (`verified_open_at`), when the ATS says it was posted, **how old it is**, whether it looks **long-open** or **reposted**, and the exact API URL it came from. No login, no proxies, no browser.
 
 > **What "open" means here.** A job is `open` when the employer's own ATS publishes it at the moment we fetch the board. That is the best public signal there is, but it is not proof of hiring intent: Greenhouse itself reports that 18–22% of jobs posted on its platform in a given quarter are ghost jobs. We give you age and repost signals so you can judge. We never claim a listing is "real" or "ghost-free".
 
@@ -16,7 +16,27 @@ Use it when an agent or workflow needs to:
 - Flag **stale listings**: `long_open` (older than 60 days, configurable) and `reposted` (same role, new job ID, within 90 days)
 - Build **hiring-signal** lists for sales (Clay, n8n, Make) or feed **AI job-search agents** (career-ops-style scanners)
 
-Do **not** use it for: LinkedIn, Indeed or Glassdoor listings (we never contact them), Workday, Workable or Recruitee boards (not supported, see below), applying to jobs, or candidate/recruiter data.
+Do **not** use it for: LinkedIn, Indeed or Glassdoor listings (we never contact them), SmartRecruiters, Workday, Workable or Recruitee boards (not supported, see below), applying to jobs, or candidate/recruiter data.
+
+## Live job listings straight from the company's ATS
+
+Most employers publish openings through an applicant-tracking system. Greenhouse, Lever and Ashby each have a documented public job-board API, and this Actor reads **only those official APIs**. Every job you get is **currently published on the employer's own hiring system** at `verified_open_at`, not a copy on an aggregator.
+
+That is not proof the role is being filled: Greenhouse reports that 18–22% of jobs on its own platform in a given quarter are ghost jobs. So every row also carries the signals you can measure from public data:
+
+| Field | Meaning |
+| --- | --- |
+| `posted_at`, `age_days`, `age_basis` | ATS publish date (null if the ATS gives none; never guessed) and the age it implies |
+| `long_open` | Open longer than `longOpenDays` (default 60). Evergreen roles trigger it too |
+| `reposted`, `repost_of` | Same company + title + location as a job that closed in the last 90 days, under a new id (needs 2+ tracked runs) |
+| `change`, `first_seen_at`, `last_seen_at` | Per-board history: `new`, `updated`, `unchanged`, `closed` |
+| `open_check` | `detail_open` / `detail_closed` when you enable `confirmOpen` ($0.00029 per job) |
+
+Use `excludeStale`, `maxAgeDays` and `postedWithinDays` to keep only fresh listings, and `onlyNew` with your own `stateStoreName` for "what's new since the last run".
+
+**Measured on 2026-10-17:** Stripe (Greenhouse) 732 jobs, Palantir (Lever) 310 and Ramp (Ashby) 167, one request per board, about 1.5 s for all three. A filtered Stripe run (32 engineering jobs, 10 re-checks) took 3.1 s and cost $0.035.
+
+Full guide with free Python code and MCP examples: https://fairquery.github.io/posts/live-job-listings-api-greenhouse-lever-ashby/
 
 ## Data sources
 
@@ -25,15 +45,14 @@ Do **not** use it for: LinkedIn, Indeed or Glassdoor listings (we never contact 
 | Greenhouse | `GET boards-api.greenhouse.io/v1/boards/{board}/jobs?content=true` | [Job Board API](https://developers.greenhouse.io/job-board.html): "publicly available, so authentication is not required for any GET endpoints" |
 | Lever | `GET api.lever.co/v0/postings/{company}?mode=json` | [Postings API](https://github.com/lever/postings-api): "These jobs may be scraped by third parties" |
 | Ashby | `GET api.ashbyhq.com/posting-api/job-board/{board}?includeCompensation=true` | [Public Job Posting API](https://developers.ashbyhq.com/docs/public-job-posting-api) |
-| SmartRecruiters | `GET api.smartrecruiters.com/v1/companies/{id}/postings` (pages of 100) | [Posting API](https://developers.smartrecruiters.com/docs/posting-api) (public postings, no key) |
 
-Optional per-job re-checks use the documented detail endpoints (Greenhouse `/jobs/{id}`, Lever `/postings/{company}/{id}`, SmartRecruiters `/postings/{id}`). Ashby has no documented per-job endpoint, so its rows say `detail_not_supported`.
+Optional per-job re-checks use the documented detail endpoints (Greenhouse `/jobs/{id}`, Lever `/postings/{company}/{id}`). Ashby has no documented per-job endpoint, so its rows say `detail_not_supported`.
 
-**Not included, and why:** **Workday** has no documented public API. **Recruitee**'s Careers Site API now requires the employer's own token (calls without it will return 401 from 10 February 2027). **Workable** documents its public job endpoints only for an account owner's own careers page, not for third-party use. **LinkedIn** is never contacted.
+**Not included, and why:** **SmartRecruiters**: its API host's robots.txt allows only LinkedIn's crawler, so we don't call it (no SmartRecruiters host is ever contacted, not even during discovery). **Workday** has no documented public API. **Recruitee**'s Careers Site API now requires the employer's own token (calls without it will return 401 from 10 February 2027). **Workable** documents its public job endpoints only for an account owner's own careers page, not for third-party use. **LinkedIn** is never contacted.
 
 ## How it behaves (politeness and safety)
 
-- Calls **only** the four ATS API hosts above, plus, for discovery only, pages on the **company website you supplied**.
+- Calls **only** the three ATS API hosts above, plus, for discovery only, pages on the **company website you supplied**.
 - At most 2 parallel requests per host; Lever's `Crawl-delay: 1` is honoured. Identifying User-Agent `FairqueryJobsFeed/1.0`.
 - **Kill switch:** any HTTP 403 or 429 (or an HTML block page where JSON was expected) stops all further requests to that host for the rest of the run. We never retry through other IPs or proxies.
 - Careers pages: `robots.txt` is respected (5xx or unreachable robots.txt = we don't crawl), at most 3 pages per company, private/internal IP addresses and non-standard ports are refused, every redirect is re-checked.
@@ -45,12 +64,12 @@ Optional per-job re-checks use the documented detail endpoints (Greenhouse `/job
 | --- | --- | --- | --- |
 | `companies` | `string[]` | — | Names, domains or board URLs (max 200). Board URLs and companies in the starter list resolve for free |
 | `boards` | `{ats,slug}[]` / `"ats:slug"` | — | Exact boards (max 500) |
-| `useSeedList` | bool | `false` | Scan the verified starter list (59 company boards) |
+| `useSeedList` | bool | `false` | Scan the verified starter list (51 company boards) |
 | `discover` | bool | `true` | Find boards for unknown companies (careers page, then ≤6 API probes; cached 30 days) |
 | `titleIncludes` / `titleExcludes` | `string[]` | — | Whole-word, case-insensitive, any-of |
 | `titleRegex` | string | — | Optional, ≤200 chars |
 | `locations` | `string[]` | — | Substring match on location text; `remote` also matches ATS remote flags |
-| `countries` | `string[]` | — | ISO-2 codes (`US`, `DE`); structured where the ATS has it, else place-name list (`country_basis`) |
+| `countries` | `string[]` | — | ISO-2 codes (`US`, `GB`); structured where the ATS has it, else place-name list (`country_basis`) |
 | `remote` | `any`\|`only`\|`exclude` | `any` | ATS remote flag where present, else location text (`remote_basis`) |
 | `companyFilter`, `departments`, `employmentTypes` | `string[]` | — | Substring filters |
 | `postedWithinDays` | int | — | ATS publish date at most N days ago (`includeUnknownPostedDate` keeps jobs without one) |
@@ -68,10 +87,10 @@ Optional per-job re-checks use the documented detail endpoints (Greenhouse `/job
 ```json
 {
   "companies": ["stripe.com", "https://jobs.lever.co/palantir"],
-  "boards": [{ "ats": "ashby", "slug": "ramp" }, { "ats": "smartrecruiters", "slug": "BoschGroup" }],
+  "boards": [{ "ats": "ashby", "slug": "ramp" }],
   "titleIncludes": ["engineer"],
   "titleExcludes": ["intern"],
-  "countries": ["US", "DE"],
+  "countries": ["US"],
   "postedWithinDays": 30
 }
 ```
@@ -108,7 +127,7 @@ Every row has `schema_version` (`1.0.0`), `type` (`job` | `board` | `company` | 
 | Field | Meaning |
 | --- | --- |
 | `verified_open_at` | When this run saw the job published by the employer's ATS (or re-checked it with `confirmOpen`) |
-| `posted_at` | The ATS's own publish/created time: Greenhouse `first_published`, Lever `createdAt`, Ashby `publishedAt`, SmartRecruiters `releasedDate`. `null` when absent, never guessed |
+| `posted_at` | The ATS's own publish/created time: Greenhouse `first_published`, Lever `createdAt`, Ashby `publishedAt`. `null` when absent, never guessed |
 | `ats_updated_at` | Last-modified time where the ATS gives one (Greenhouse) |
 | `first_seen_at` / `last_seen_at` | From your per-board history (named key-value store). On the first run both are now |
 | `age_days`, `age_basis` | now − `posted_at`, or now − `first_seen_at` when there is no ATS date |
@@ -135,21 +154,20 @@ Key-value store record **`RUN_SUMMARY`**: counts, events, requests per host, sto
 | `board-scanned` | $0.0005 | Each board fetched successfully (even if no job matched your filters) |
 | `open-confirmed` | $0.00029 | Each detail re-check, only with `confirmOpen: "detail"` |
 | `company-discovered` | $0.0019 | Each company whose board we found by discovery (not for board URLs, starter-list companies or cached results) |
-| `apify-actor-start` | $0.00005 | Once per run, per GB of memory (Apify default event) |
 
 Error rows, `closed` rows and merged rows are **never** charged.
 
-**Worked examples:** monitor 500 companies daily with `onlyNew`: 500 × $0.0005 = **$0.25 per check** plus $0.99 per 1,000 new jobs. Search the whole starter list (59 boards, ~21,500 listed jobs on 2026-10-17) for remote engineering roles posted in the last 14 days: 59 × $0.0005 + matching jobs × $0.00099.
+**Worked examples:** monitor 500 companies daily with `onlyNew`: 500 × $0.0005 = **$0.25 per check** plus $0.99 per 1,000 new jobs. Search the whole starter list (51 boards, ~13,400 listed jobs on 2026-10-17) for remote engineering roles posted in the last 14 days: 51 × $0.0005 + matching jobs × $0.00099.
 
 To cap spend, set a maximum cost per run in the run options; the Actor stops cleanly before the limit and never delivers unpaid rows. `maxJobs` caps job rows per run.
 
 ## Memory / runtime
 
-Default **256 MB** (max 512 MB), timeout 900 s. HTTP only (no browser, no proxy). A Greenhouse, Lever or Ashby board is one request (0.1–2 s); a SmartRecruiters board is one request per 100 postings (Bosch, ~5,000 postings: 51 requests, ~25 s).
+Default **256 MB** (max 512 MB), timeout 900 s. HTTP only (no browser, no proxy). Each Greenhouse, Lever or Ashby board is one request (0.1–2 s; Stripe's 732 jobs, Palantir's 310 and Ramp's 167 took about 1.5 s together). Very large Greenhouse boards (over 40 MB with descriptions, e.g. Anduril's ~2,500 jobs) are read from the lighter list without content.
 
 ## MCP / Apify tools
 
-Call from agents via [Apify MCP](https://mcp.apify.com) with Actor `fairquery/company-jobs-feed`, or use the local stdio MCP server in the GitHub repo (free `jobs_get_board`, `jobs_find_board`, `jobs_check_open`, `jobs_list_seed_boards`, and paid `jobs_search_companies`).
+Call from agents via [Apify MCP](https://mcp.apify.com) with Actor `fairquery/company-jobs-feed`, or use the stdio MCP server [`@fairquery/company-jobs-feed-mcp`](https://www.npmjs.com/package/@fairquery/company-jobs-feed-mcp) (`npx -y @fairquery/company-jobs-feed-mcp`; free `jobs_get_board`, `jobs_find_board`, `jobs_check_open`, `jobs_list_seed_boards`, and paid `jobs_search_companies`).
 
 ```json
 {
@@ -189,7 +207,7 @@ We only use endpoints the ATS documents for public, third-party use. See "Not in
 
 **Is there a global search over all companies?**
 
-No global index: search covers the boards in your run. Set `useSeedList: true` to search the 59 verified starter boards, or bring your own list.
+No global index: search covers the boards in your run. Set `useSeedList: true` to search the 51 verified starter boards, or bring your own list.
 
 **How much does it cost?**
 
@@ -216,7 +234,7 @@ All Fairquery Actors: https://apify.com/fairquery
 
 ## Disclaimer
 
-Job data comes from each employer's public ATS job board and belongs to the employer. Fields are passed through as published (with light normalization); age, remote, country and stale signals are heuristics where labelled. No warranty that a listed job is still being hired for. Fairquery is not affiliated with Greenhouse, Lever, Ashby, SmartRecruiters or LinkedIn.
+Job data comes from each employer's public ATS job board and belongs to the employer. Fields are passed through as published (with light normalization); age, remote, country and stale signals are heuristics where labelled. No warranty that a listed job is still being hired for. Fairquery is not affiliated with Greenhouse, Lever, Ashby or LinkedIn.
 
 ## Links
 

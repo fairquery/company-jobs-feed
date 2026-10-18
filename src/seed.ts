@@ -1,5 +1,5 @@
 // Verified starter list of company job boards (official public ATS APIs only).
-// Each board returned >=1 published job on its documented API on verified_at; Greenhouse/SmartRecruiters
+// Each board returned >=1 published job on its documented API on verified_at; Greenhouse
 // identity confirmed via the API's company name, Lever/Ashby via the company named in the job descriptions.
 // Re-verify with `npm run verify-seed` before each release.
 import type { Ats } from './types.js';
@@ -473,77 +473,5 @@ export const SEED_BOARDS: SeedBoard[] = [
         verified_at: '2026-10-17',
         verified_by: 'company_named_in_job_descriptions',
         jobs_at_verification: 11,
-    },
-    {
-        company: 'Bosch Group',
-        domain: 'bosch.com',
-        ats: 'smartrecruiters',
-        slug: 'BoschGroup',
-        verified_at: '2026-10-17',
-        verified_by: 'api_company_name',
-        jobs_at_verification: 5074,
-    },
-    {
-        company: 'ServiceNow',
-        domain: 'servicenow.com',
-        ats: 'smartrecruiters',
-        slug: 'ServiceNow',
-        verified_at: '2026-10-17',
-        verified_by: 'api_company_name',
-        jobs_at_verification: 700,
-    },
-    {
-        company: 'Ubisoft',
-        domain: 'ubisoft.com',
-        ats: 'smartrecruiters',
-        slug: 'Ubisoft2',
-        verified_at: '2026-10-17',
-        verified_by: 'api_company_name',
-        jobs_at_verification: 329,
-    },
-    {
-        company: 'Wix',
-        domain: 'wix.com',
-        ats: 'smartrecruiters',
-        slug: 'Wix2',
-        verified_at: '2026-10-17',
-        verified_by: 'api_company_name',
-        jobs_at_verification: 74,
-    },
-    {
-        company: 'Equinox',
-        domain: 'equinox.com',
-        ats: 'smartrecruiters',
-        slug: 'Equinox',
-        verified_at: '2026-10-17',
-        verified_by: 'api_company_name',
-        jobs_at_verification: 756,
-    },
-    {
-        company: 'Western Digital',
-        domain: 'westerndigital.com',
-        ats: 'smartrecruiters',
-        slug: 'WesternDigital',
-        verified_at: '2026-10-17',
-        verified_by: 'api_company_name',
-        jobs_at_verification: 334,
-    },
-    {
-        company: 'Experian',
-        domain: 'experian.com',
-        ats: 'smartrecruiters',
-        slug: 'Experian',
-        verified_at: '2026-10-17',
-        verified_by: 'api_company_name',
-        jobs_at_verification: 398,
-    },
-    {
-        company: 'Avery Dennison',
-        domain: 'averydennison.com',
-        ats: 'smartrecruiters',
-        slug: 'AveryDennison',
-        verified_at: '2026-10-17',
-        verified_by: 'api_company_name',
-        jobs_at_verification: 492,
     },
 ];

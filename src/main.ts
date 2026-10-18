@@ -1,12 +1,19 @@
 import { Actor, type KeyValueStore, log } from 'apify';
 
-import { detailUrl, fetchBoard, isValidSlug, srDetailDescription } from './ats.js';
+import { detailUrl, fetchBoard, isValidSlug } from './ats.js';
 import { DuplicateTracker, mergeRoles } from './dedupe.js';
-import { discoverCompany, domainOf, parseBoardUrl, registrableDomain, seedLookup } from './discovery.js';
+import {
+    discoverCompany,
+    domainOf,
+    parseBoardUrl,
+    registrableDomain,
+    seedLookup,
+    unsupportedAts,
+} from './discovery.js';
 import { Emitter } from './emitter.js';
 import { compileFilters, matches } from './filters.js';
 import { AtsClient, CareersFetcher, HostGate, HttpError } from './http.js';
-import { prettySlug, scrubPII } from './normalize.js';
+import { prettySlug } from './normalize.js';
 import { buildClosedRow, buildJobRow, jobFingerprint, type RowContext } from './rows.js';
 import { SEED_BOARDS } from './seed.js';
 import { applyHistory, type BoardState, type DiscoveryCacheEntry, discoveryKey, stateKey } from './state.js';
@@ -208,7 +215,7 @@ for (const [i, b] of input.boards.entries()) {
     } else {
         await pushError({
             code: 'INVALID_BOARD',
-            message: `boards[${i}] must be {ats: greenhouse|lever|ashby|smartrecruiters, slug} or a board URL. Workday, Workable, Recruitee and LinkedIn are not supported.`,
+            message: `boards[${i}] must be {ats: greenhouse|lever|ashby, slug} or a board URL. SmartRecruiters, Workday, Workable, Recruitee and LinkedIn are not supported.`,
             retryable: false,
             source_url: null,
             context: { index: i, value: typeof b === 'string' ? b.slice(0, 200) : b },
@@ -266,6 +273,18 @@ async function resolveCompany(rawInput: string): Promise<void> {
             domain: seed?.domain,
             discovered_via: 'board_url',
             input: rawInput,
+        });
+        return;
+    }
+    const unsupported = unsupportedAts(rawInput);
+    if (unsupported) {
+        counters.companies_unresolved++;
+        await pushError({
+            code: 'UNSUPPORTED_ATS',
+            message: `"${rawInput}" points at ${unsupported}, which this Actor does not read (only Greenhouse, Lever and Ashby public job-board APIs). Nothing was fetched.`,
+            retryable: false,
+            input: rawInput,
+            source_url: null,
         });
         return;
     }
@@ -353,7 +372,7 @@ async function resolveCompany(rawInput: string): Promise<void> {
         counters.companies_unresolved++;
         await pushError({
             code: 'NO_BOARD_FOUND',
-            message: `No Greenhouse, Lever, Ashby or SmartRecruiters board found for "${rawInput}" (${d.pagesFetched.length} careers pages, ${d.probes} API probes).`,
+            message: `No Greenhouse, Lever or Ashby board found for "${rawInput}" (${d.pagesFetched.length} careers pages, ${d.probes} API probes).`,
             retryable: transient,
             input: rawInput,
             source_url: null,
@@ -638,11 +657,7 @@ async function confirmOpen(r: JobRow): Promise<{ row: JobRow; charged: boolean }
                 charged: true,
             };
         }
-        let desc = r.description_text;
-        if (r.ats === 'smartrecruiters' && input.includeDescription === 'text' && !desc) {
-            desc = srDetailDescription(res.json);
-            if (desc && input.scrubPII) desc = scrubPII(desc).text;
-        }
+        const desc = r.description_text;
         return {
             row: {
                 ...r,

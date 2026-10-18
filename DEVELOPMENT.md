@@ -7,7 +7,7 @@ This file covers local development of the **Company Jobs Feed** Apify Actor. The
 | Path | What |
 | --- | --- |
 | `src/main.ts` | Actor entry: input checks, board resolution, scan, history, filters, dedupe, charging |
-| `src/ats.ts` | The four official ATS APIs: URLs, mappers, SmartRecruiters paging, Greenhouse large-board fallback |
+| `src/ats.ts` | The three official ATS APIs: URLs, mappers, Greenhouse large-board fallback |
 | `src/http.ts` | `AtsClient` (fixed hosts, kill switch, per-host gate) and `CareersFetcher` (SSRF guard, DNS pinning, robots.txt) |
 | `src/discovery.ts` | Board URL parsing, careers-page link extraction, slug probes (max 6) |
 | `src/state.ts` | History per board: first/last seen, updated/closed, repost detection |
@@ -41,7 +41,7 @@ node scripts/smoke-test.mjs --live                  # also calls the free tools 
 ## Notes
 
 - Sample values in the input schema are `prefill` only, never `default`. An API call without input fails fast with `INPUT_EMPTY` and is not billed. Keep it that way.
-- Never add a host to `ATS_API_HOSTS` without confirming its API is documented for outside use. Recruitee, Workable, Workday and LinkedIn are deliberately not supported (see README).
+- Never add a host to `ATS_API_HOSTS` without confirming its API is documented for outside use. SmartRecruiters (its API robots.txt allows only LinkedIn's crawler), Recruitee, Workable, Workday and LinkedIn are deliberately not supported and blocked by `EXCLUDED_HOST_SUFFIXES` (see README).
 - Rows are charged only after they are pushed; error, closed and merged rows are free. The emitter never pushes a charged row the run's max-cost budget can't cover.
 - History for a board is saved only when its output was delivered in full, so `onlyNew` never loses jobs after a stop.
 - The Actor is deployed to Apify as source files (`apify push`), not from this Git repo.
