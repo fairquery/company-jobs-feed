@@ -20,3 +20,5 @@ dist
 **/node_modules
 **/dist
 test-runs
+mcp/build
+*.mcpb

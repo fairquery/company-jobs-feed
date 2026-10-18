@@ -21,3 +21,5 @@ jobs:
             - run: npm --prefix mcp ci --ignore-scripts
             - run: npm --prefix mcp run build
             - run: npm --prefix mcp test
+            - run: npm --prefix mcp run build:mcpb
+            - run: npm --prefix mcp run test:mcpb

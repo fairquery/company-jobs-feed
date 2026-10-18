@@ -10,3 +10,11 @@ npm test   # shared-source check + smoke test (no token, no network)
 ```
 
 `src/shared/` is generated from `../src` by `npm run sync`; do not edit it here. See the [repository README](../README.md) for tool details and [SECURITY.md](../SECURITY.md).
+
+## MCPB bundle (Smithery local install, Claude Desktop)
+`manifest.json` describes an [MCPB](https://github.com/modelcontextprotocol/mcpb) bundle that runs this server locally over stdio. The bundle asks for one optional, sensitive setting: **your own** Apify API token, only needed for `jobs_search_companies`. Leave it empty to use only the free tools.
+
+```bash
+npm run build:mcpb   # -> build/fairquery-company-jobs-feed-mcp-<version>.mcpb (dist + production node_modules)
+npm run test:mcpb    # unpack, initialize, tools/list, free call, paid call without token -> APIFY_TOKEN_MISSING
+```

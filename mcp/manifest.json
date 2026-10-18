@@ -1,0 +1,58 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/main/dist/mcpb-manifest-v0.3.schema.json",
+  "manifest_version": "0.3",
+  "name": "fairquery-company-jobs-feed-mcp",
+  "display_name": "Fairquery Company Jobs Feed",
+  "version": "1.0.1",
+  "description": "Local MCP server: live jobs from companies' public Greenhouse, Lever and Ashby boards. Free local tools; optional paid multi-company search uses your own Apify token.",
+  "long_description": "Runs on your machine over stdio. Free tools need no account or token and call the official public job-board APIs of Greenhouse, Lever and Ashby directly from your machine (board name and job IDs are sent to those ATS APIs): fetch and filter one board, find a company's board, re-check whether a job is still open, and list a bundled starter set of verified boards. The optional paid tool jobs_search_companies runs the public Apify Actor fairquery/company-jobs-feed with YOUR OWN Apify API token and is billed to your Apify account; leave the token empty to use only the free tools. Fairquery code sends nothing to Fairquery. Tip: use an Apify scoped token limited to running fairquery/company-jobs-feed.",
+  "author": {
+    "name": "Fairquery",
+    "email": "fairquery@proton.me",
+    "url": "https://fairquery.github.io/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fairquery/company-jobs-feed"
+  },
+  "homepage": "https://fairquery.github.io/posts/live-job-listings-api-greenhouse-lever-ashby/",
+  "documentation": "https://github.com/fairquery/company-jobs-feed/tree/main/mcp#readme",
+  "support": "https://github.com/fairquery/company-jobs-feed/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "APIFY_TOKEN": "${user_config.apify_token}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "jobs_get_board", "description": "Free. Fetch every job on one company board from its official public Greenhouse, Lever or Ashby API, normalized and filtered locally." },
+    { "name": "jobs_find_board", "description": "Free. Resolve a company name, domain or careers/board URL to its public Greenhouse, Lever or Ashby board(s)." },
+    { "name": "jobs_check_open", "description": "Free. Re-check one job on the employer's ATS right now and report open or closed." },
+    { "name": "jobs_list_seed_boards", "description": "Free (offline). List the bundled starter set of company boards verified on their official ATS APIs." },
+    { "name": "jobs_search_companies", "description": "Paid (your Apify token). Run fairquery/company-jobs-feed over many companies: discovery, filters, history and repost signals." }
+  ],
+  "tools_generated": false,
+  "keywords": ["jobs", "greenhouse", "lever", "ashby", "job-board-api", "ats", "recruiting"],
+  "license": "MIT",
+  "privacy_policies": ["https://fairquery.github.io/privacy/"],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": { "node": ">=20.0.0" }
+  },
+  "user_config": {
+    "apify_token": {
+      "type": "string",
+      "title": "Apify API token (optional)",
+      "description": "Optional. YOUR OWN Apify API token, only needed for the paid jobs_search_companies tool; usage is billed to your Apify account. Leave empty to use only the free tools. Create one at https://console.apify.com/settings/integrations (a scoped token limited to fairquery/company-jobs-feed is recommended).",
+      "sensitive": true,
+      "required": false,
+      "default": ""
+    }
+  }
+}
