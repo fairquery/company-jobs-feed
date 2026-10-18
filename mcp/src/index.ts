@@ -11,15 +11,19 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 
 import { compact, errorResult, getToken, MISSING_TOKEN_MESSAGE, paged, pagedOutputSchema, READ_ONLY_LOCAL, READ_ONLY_OPEN_WORLD, runActor } from './common.js';
-import { detailUrl, fetchBoard, isValidSlug, listUrl } from './shared/ats.js';
+import { detailUrl, fetchBoard, isValidSlug, listUrl, mapGreenhouse, mapLever } from './shared/ats.js';
 import { discoverCompany, parseBoardUrl, seedLookup } from './shared/discovery.js';
 import { compileFilters, matches } from './shared/filters.js';
 import { AtsClient, CareersFetcher, HostGate, HttpError } from './shared/http.js';
+import { prettySlug } from './shared/normalize.js';
 import { buildJobRow, jobFingerprint, type RowContext } from './shared/rows.js';
 import { SEED_BOARDS } from './shared/seed.js';
-import type { Ats } from './shared/types.js';
+import type { Ats, NormalizedJob } from './shared/types.js';
 
-export const VERSION = '1.0.6';
+type GhJob = Parameters<typeof mapGreenhouse>[1];
+type LeverJob = Parameters<typeof mapLever>[1];
+
+export const VERSION = '1.1.0';
 const ATS = ['greenhouse', 'lever', 'ashby'] as const;
 
 const atsSchema = z
@@ -128,13 +132,13 @@ function createServer(): McpServer {
         {
             title: 'Re-check whether one job is still published (free)',
             description: [
-                'WHAT: Re-check ONE job on the employer\'s ATS right now and report open or closed.',
-                'WHEN: Before applying, alerting or contacting about a specific job you got earlier (job_key or ats + slug + jobId).',
-                'WHEN NOT: Listing jobs (jobs_get_board) or checking many jobs at once (jobs_search_companies with confirmOpen, paid). Full text of one job: jobs_get_board with includeDescription=true (free), then pick the row by job_key.',
+                'WHAT: Re-check ONE job on the employer\'s ATS right now and report open or closed; optionally return that job\'s full row with its description.',
+                'WHEN: Before applying, alerting or contacting about a specific job you got earlier (job_key or ats + slug + jobId), or to read one job\'s full details (includeDescription=true).',
+                'WHEN NOT: Listing jobs (jobs_get_board) or checking many jobs at once (jobs_search_companies with confirmOpen, paid).',
                 'BEHAVIOR: Greenhouse, Lever: one GET to the documented per-job endpoint; HTTP 404 = closed. Ashby has no per-job endpoint, so the whole board is fetched once and searched for the id (method "board_listing"). "open" means currently published by the employer; it does not prove the role is still being filled.',
                 'COST: No APIFY_TOKEN, no billing.',
-                'RETURNS: One "open_check" row, or a tool error: INVALID_INPUT, BOARD_NOT_FOUND, HOST_BLOCKED or NETWORK_ERROR (the last two retryable).',
-                'PARAMETERS: Give either jobKey alone, or ats + slug + jobId; jobKey wins when both are given. A malformed jobKey, or neither form complete, returns INVALID_INPUT without a request. An Ashby id costs one full board download (the same request as jobs_get_board); on Greenhouse and Lever a 404 triggers one extra board request so a closed job (status closed) is told apart from a missing board (BOARD_NOT_FOUND).',
+                'RETURNS: One "open_check" row (job = the full "job" row when includeDescription=true and the job is open, else null), or a tool error: INVALID_INPUT, BOARD_NOT_FOUND, HOST_BLOCKED or NETWORK_ERROR (the last two retryable).',
+                'PARAMETERS: Give either jobKey alone, or ats + slug + jobId; jobKey wins when both are given. A malformed jobKey, or neither form complete, returns INVALID_INPUT without a request. An Ashby id costs one full board download (the same request as jobs_get_board); on Greenhouse and Lever a 404 triggers one extra board request so a closed job (status closed) is told apart from a missing board (BOARD_NOT_FOUND). includeDescription adds no request on Greenhouse and Lever (the per-job response already holds the text) and makes the Ashby board download include descriptions; description_text is plain text, <= 20,000 chars, e-mails/phones removed, exactly as in jobs_get_board. A closed job has no data left to return (job = null).',
                 'EXAMPLE: {"jobKey":"greenhouse:stripe:8172503"} -> {"status":"open","method":"detail_endpoint"}.',
             ].join('\n'),
             inputSchema: {
@@ -146,6 +150,7 @@ function createServer(): McpServer {
                     .optional()
                     .describe('Required unless jobKey is given. Board slug from the public board URL (boards.greenhouse.io/{slug}, jobs.lever.co/{slug}, jobs.ashbyhq.com/{slug}; the middle part of job_key), case-insensitive, 1-100 chars: a letter or digit, then letters, digits, ".", "_" or "-". Example: "stripe"'),
                 jobId: z.string().min(1).max(100).optional().describe('Required unless jobKey is given. The ATS job id (job_id field, the last part of job_key), 1-100 chars: numeric on Greenhouse, a UUID on Lever and Ashby. Example: "8172503"'),
+                includeDescription: z.boolean().optional().describe('Optional boolean, default false. true adds job: the full job row (title, location, compensation, posted_at, description_text, ...) when the job is open. Example: true'),
             },
             outputSchema: pagedOutputSchema,
             annotations: { title: 'Re-check whether one job is still published (free)', ...READ_ONLY_OPEN_WORLD },
@@ -166,12 +171,23 @@ function createServer(): McpServer {
                 if (url) {
                     const r = await client.getJson<unknown>(url);
                     if (r.status === 404 && (await boardMissing(ats, slug))) return errorResult('BOARD_NOT_FOUND', `Board ${ats}/${slug} not found.`);
-                    return paged([{ type: 'open_check', ats, slug, job_id: id, status: r.status === 200 ? 'open' : 'closed', method: 'detail_endpoint', checked_at: checkedAt, source_url: url }], 1, 0, { cost_usd: 0 });
+                    const isOpen = r.status === 200;
+                    let job: unknown = null;
+                    if (isOpen && a.includeDescription && r.json) {
+                        const hint = seedFor(ats, slug)?.company ?? prettySlug(slug);
+                        const nj = ats === 'greenhouse' ? mapGreenhouse(slug, r.json as GhJob, (typeof (r.json as { company_name?: unknown }).company_name === 'string' ? ((r.json as { company_name: string }).company_name) : hint), true) : mapLever(slug, r.json as LeverJob, hint, true);
+                        job = jobRowFor(nj, ats, slug, checkedAt, url);
+                    }
+                    const row: Record<string, unknown> = { type: 'open_check', ats, slug, job_id: id, status: isOpen ? 'open' : 'closed', method: 'detail_endpoint', checked_at: checkedAt, source_url: url };
+                    if (a.includeDescription) row.job = job;
+                    return paged([row], 1, 0, { cost_usd: 0 });
                 }
-                const f = await fetchBoard(client, ats, slug, { maxJobs: 20_000, withDescription: false });
+                const f = await fetchBoard(client, ats, slug, { maxJobs: 20_000, withDescription: a.includeDescription === true, companyHint: seedFor(ats, slug)?.company });
                 if (f.notFound) return errorResult('BOARD_NOT_FOUND', `Board ${ats}/${slug} not found.`);
-                const open = f.jobs.some((j) => j.job_id === id);
-                return paged([{ type: 'open_check', ats, slug, job_id: id, status: open ? 'open' : 'closed', method: 'board_listing', checked_at: checkedAt, source_url: f.sourceUrl }], 1, 0, { cost_usd: 0 });
+                const hit = f.jobs.find((j) => j.job_id === id);
+                const row: Record<string, unknown> = { type: 'open_check', ats, slug, job_id: id, status: hit ? 'open' : 'closed', method: 'board_listing', checked_at: checkedAt, source_url: f.sourceUrl };
+                if (a.includeDescription) row.job = hit ? jobRowFor(hit, ats, slug, checkedAt, f.sourceUrl) : null;
+                return paged([row], 1, 0, { cost_usd: 0 });
             } catch (e) {
                 return httpErr(e);
             }
@@ -279,6 +295,13 @@ function createServer(): McpServer {
     }
 
     return server;
+}
+
+/** The same row jobs_get_board returns for one job (no history: change = null). */
+function jobRowFor(nj: NormalizedJob, ats: Ats, slug: string, nowIso: string, sourceUrl: string) {
+    const domain = seedFor(ats, slug)?.domain ?? null;
+    const ctx: RowContext = { nowIso, nowMs: Date.parse(nowIso), domain, sourceUrl, longOpenDays: 60, scrub: true };
+    return { ...buildJobRow(nj, null, jobFingerprint(nj, domain), ctx), change: null };
 }
 
 function seedFor(ats: Ats, slug: string) {

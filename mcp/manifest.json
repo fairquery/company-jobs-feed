@@ -3,7 +3,7 @@
   "manifest_version": "0.3",
   "name": "fairquery-company-jobs-feed-mcp",
   "display_name": "Fairquery Company Jobs Feed",
-  "version": "1.0.6",
+  "version": "1.1.0",
   "description": "Local MCP server: live jobs from companies' public Greenhouse, Lever and Ashby boards. Free local tools; optional paid multi-company search uses your own Apify token.",
   "long_description": "Runs on your machine over stdio. Free tools need no account or token and call the official public job-board APIs of Greenhouse, Lever and Ashby directly from your machine (board name and job IDs are sent to those ATS APIs): fetch and filter one board, find a company's board, re-check whether a job is still open, and list a bundled starter set of verified boards. The optional paid tool jobs_search_companies runs the public Apify Actor fairquery/company-jobs-feed with YOUR OWN Apify API token and is billed to your Apify account; leave the token empty to use only the free tools. Fairquery code sends nothing to Fairquery. Tip: use an Apify scoped token limited to running fairquery/company-jobs-feed.",
   "author": {

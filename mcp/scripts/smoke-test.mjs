@@ -73,6 +73,17 @@ if (live) {
     console.log('OK live greenhouse check ->', key2, c2.structuredContent?.items?.[0]?.status);
     const c3 = await client.callTool({ name: 'jobs_check_open', arguments: { ats: 'greenhouse', slug: 'stripe', jobId: '1' } });
     console.log('OK live closed id ->', c3.structuredContent?.items?.[0]?.status);
+    for (const k of [key2, key]) {
+        if (!k) continue;
+        const d = await client.callTool({ name: 'jobs_check_open', arguments: { jobKey: k, includeDescription: true } });
+        const row = d.structuredContent?.items?.[0];
+        if (row?.status !== 'open' || row.job?.job_key !== k || !(row.job.description_text?.length > 50)) fail('includeDescription ' + JSON.stringify(row).slice(0, 300));
+        if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(row.job.description_text)) fail('description_text kept an e-mail address');
+        console.log(`OK live jobs_check_open includeDescription ${row.method} -> "${row.job.title}", ${row.job.description_text.length} chars`);
+    }
+    const dc = await client.callTool({ name: 'jobs_check_open', arguments: { ats: 'greenhouse', slug: 'stripe', jobId: '1', includeDescription: true } });
+    if (dc.structuredContent?.items?.[0]?.job !== null) fail('closed job should have job = null');
+    console.log('OK live closed id + includeDescription -> job null');
     const nf = await client.callTool({ name: 'jobs_get_board', arguments: { ats: 'lever', slug: 'no-such-board-fq-test' } });
     console.log('OK live unknown board ->', JSON.parse(nf.content[0].text).error);
     const f = await client.callTool({ name: 'jobs_find_board', arguments: { company: 'Hightouch' } });
