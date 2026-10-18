@@ -42,6 +42,8 @@ Requires Node.js 20+. From npm: [`@fairquery/company-jobs-feed-mcp`](https://www
 }
 ```
 
+Gemini CLI: `gemini extensions install https://github.com/fairquery/company-jobs-feed` (runs the npm package with `npx`; one optional, sensitive setting for your own Apify token).
+
 From source: `git clone https://github.com/fairquery/company-jobs-feed && cd company-jobs-feed/mcp && npm ci --ignore-scripts && npm run build && node dist/index.js`.
 
 Docker: `docker build -t fairquery-jobs-feed-mcp . && docker run -i --rm fairquery-jobs-feed-mcp`.

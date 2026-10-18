@@ -1,5 +1,11 @@
 # Changelog (@fairquery/company-jobs-feed-mcp)
 
+## 1.1.1 - 2026-10-18
+- Packaging only (no code, tool, schema, limit or price changes):
+  - `gemini-extension.json` at the repo root: install as a Gemini CLI extension with `gemini extensions install https://github.com/fairquery/company-jobs-feed`. It runs `npx -y @fairquery/company-jobs-feed-mcp@1.1.1` and asks for one optional, sensitive setting (your own `APIFY_TOKEN`, only for jobs_search_companies).
+  - `.mcp.json` and `.cursor-plugin/plugin.json` at the repo root for Cursor plugin directories (cursor.directory).
+  - Security dependency overrides from the repo (basic-ftp, vitest) apply to the Actor at the repo root, not to this package.
+
 ## 1.1.0 - 2026-10-18
 - `jobs_check_open`: new optional `includeDescription` (default false). When the job is open, the open_check row gets `job`: the same full job row jobs_get_board returns (title, location, compensation, posted_at, description_text, ...); closed jobs get `job: null`. No extra request on Greenhouse and Lever (the per-job response already holds the text); on Ashby the board download includes descriptions. Without the flag the row is unchanged.
 - Smoke test (`--live`) covers Greenhouse, Ashby and a closed id with includeDescription.

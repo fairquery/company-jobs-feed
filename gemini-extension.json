@@ -1,0 +1,19 @@
+{
+  "name": "fairquery-company-jobs-feed",
+  "version": "1.1.1",
+  "description": "Live jobs from companies' own Greenhouse, Lever and Ashby boards, with posting age, long-open and repost signals. Free local tools; optional multi-company search bills your own Apify account.",
+  "mcpServers": {
+    "fairquery-jobs-feed": {
+      "command": "npx",
+      "args": ["-y", "@fairquery/company-jobs-feed-mcp@1.1.1"]
+    }
+  },
+  "settings": [
+    {
+      "name": "Apify API token (optional)",
+      "description": "Only needed for the paid jobs_search_companies tool, which runs on and bills YOUR Apify account. Leave empty to use the free local tools.",
+      "envVar": "APIFY_TOKEN",
+      "sensitive": true
+    }
+  ]
+}

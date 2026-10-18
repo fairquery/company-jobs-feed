@@ -23,7 +23,7 @@ import type { Ats, NormalizedJob } from './shared/types.js';
 type GhJob = Parameters<typeof mapGreenhouse>[1];
 type LeverJob = Parameters<typeof mapLever>[1];
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.1.1';
 const ATS = ['greenhouse', 'lever', 'ashby'] as const;
 
 const atsSchema = z

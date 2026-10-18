@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "fairquery-jobs-feed": {
+      "command": "npx",
+      "args": ["-y", "@fairquery/company-jobs-feed-mcp"],
+      "env": {
+        "APIFY_TOKEN": "${env:APIFY_TOKEN}"
+      }
+    }
+  }
+}

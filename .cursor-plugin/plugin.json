@@ -1,0 +1,15 @@
+{
+  "name": "fairquery-company-jobs-feed",
+  "displayName": "Fairquery Company Jobs Feed",
+  "version": "1.1.1",
+  "description": "MCP server for live job listings from companies' own Greenhouse, Lever and Ashby boards, with posting age, long-open and repost signals. Free local tools; optional multi-company search bills your own Apify account.",
+  "author": {
+    "name": "Fairquery",
+    "email": "fairquery@proton.me"
+  },
+  "homepage": "https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/",
+  "repository": "https://github.com/fairquery/company-jobs-feed",
+  "license": "MIT",
+  "keywords": ["mcp", "jobs", "job-listings", "greenhouse", "lever", "ashby", "recruiting"],
+  "logo": "mcp/assets/icon.png"
+}
