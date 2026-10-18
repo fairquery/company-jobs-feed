@@ -19,7 +19,7 @@ import { buildJobRow, jobFingerprint, type RowContext } from './shared/rows.js';
 import { SEED_BOARDS } from './shared/seed.js';
 import type { Ats } from './shared/types.js';
 
-export const VERSION = '1.0.3';
+export const VERSION = '1.0.4';
 const ATS = ['greenhouse', 'lever', 'ashby'] as const;
 
 const atsSchema = z

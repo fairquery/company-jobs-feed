@@ -3,19 +3,19 @@
   "manifest_version": "0.3",
   "name": "fairquery-company-jobs-feed-mcp",
   "display_name": "Fairquery Company Jobs Feed",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Local MCP server: live jobs from companies' public Greenhouse, Lever and Ashby boards. Free local tools; optional paid multi-company search uses your own Apify token.",
   "long_description": "Runs on your machine over stdio. Free tools need no account or token and call the official public job-board APIs of Greenhouse, Lever and Ashby directly from your machine (board name and job IDs are sent to those ATS APIs): fetch and filter one board, find a company's board, re-check whether a job is still open, and list a bundled starter set of verified boards. The optional paid tool jobs_search_companies runs the public Apify Actor fairquery/company-jobs-feed with YOUR OWN Apify API token and is billed to your Apify account; leave the token empty to use only the free tools. Fairquery code sends nothing to Fairquery. Tip: use an Apify scoped token limited to running fairquery/company-jobs-feed.",
   "author": {
     "name": "Fairquery",
     "email": "fairquery@proton.me",
-    "url": "https://fairquery.github.io/"
+    "url": "https://getfairquery.com/"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/fairquery/company-jobs-feed"
   },
-  "homepage": "https://fairquery.github.io/posts/live-job-listings-api-greenhouse-lever-ashby/",
+  "homepage": "https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/",
   "documentation": "https://github.com/fairquery/company-jobs-feed/tree/main/mcp#readme",
   "support": "https://github.com/fairquery/company-jobs-feed/issues",
   "icon": "icon.png",
@@ -40,7 +40,7 @@
   "tools_generated": false,
   "keywords": ["jobs", "greenhouse", "lever", "ashby", "job-board-api", "ats", "recruiting"],
   "license": "MIT",
-  "privacy_policies": ["https://fairquery.github.io/privacy/"],
+  "privacy_policies": ["https://getfairquery.com/privacy/"],
   "compatibility": {
     "platforms": ["darwin", "win32", "linux"],
     "runtimes": { "node": ">=20.0.0" }

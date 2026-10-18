@@ -1,5 +1,5 @@
 export const SCHEMA_VERSION = '1.0.0';
-export const USER_AGENT = 'FairqueryJobsFeed/1.0 (+https://fairquery.github.io; fairquery@proton.me)';
+export const USER_AGENT = 'FairqueryJobsFeed/1.0 (+https://getfairquery.com; fairquery@proton.me)';
 /** Product token used for robots.txt group matching. */
 export const ROBOTS_AGENT = 'FairqueryJobsFeed';
 

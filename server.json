@@ -3,18 +3,18 @@
   "name": "io.github.fairquery/company-jobs-feed-mcp",
   "title": "Fairquery Company Jobs Feed",
   "description": "Live jobs from company Greenhouse, Lever and Ashby boards with age, long-open and repost signals.",
-  "websiteUrl": "https://fairquery.github.io/posts/live-job-listings-api-greenhouse-lever-ashby/",
+  "websiteUrl": "https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/",
   "repository": {
     "url": "https://github.com/fairquery/company-jobs-feed",
     "source": "github",
     "subfolder": "mcp"
   },
-  "version": "1.0.3",
+  "version": "1.0.4",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@fairquery/company-jobs-feed-mcp",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "transport": {
         "type": "stdio"
       },
