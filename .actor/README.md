@@ -241,8 +241,8 @@ All Fairquery Actors: https://apify.com/fairquery
 ## Data handling, security and support
 
 - **Data retention:** Each run keeps its own storages in your Apify account under your Apify plan's retention, plus per-board job history (job IDs, titles, locations, first- and last-seen dates) in a named store (default `fairquery-jobs-feed-state`) until you delete it. You can delete run storages and named stores at any time in Apify Console or through the API. Fairquery's code sends nothing to Fairquery. Details per tool: https://getfairquery.com/security/
-- **Security reports:** email fairquery@proton.me or use private vulnerability reporting on the GitHub repository (process and response targets: https://getfairquery.com/security/#report).
-- **Support:** the Issues tab on this page, a GitHub issue, or fairquery@proton.me. We aim to reply within 3 business days (a target, not an SLA).
+- **Security reports:** email info@getfairquery.com or use private vulnerability reporting on the GitHub repository (process and response targets: https://getfairquery.com/security/#report).
+- **Support:** the Issues tab on this page, a GitHub issue, or info@getfairquery.com. We aim to reply within 3 business days (a target, not an SLA).
 - **Changes and procurement:** release notes are in the GitHub repository's releases and changelog. Limits, versioning, third parties and other procurement answers: https://getfairquery.com/trust/
 
 ## Disclaimer
@@ -254,5 +254,5 @@ Job data comes from each employer's public ATS job board and belongs to the empl
 - Guide: [Live job listings API straight from company ATS boards (Greenhouse, Lever, Ashby)](https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/)
 - Apify Store: https://apify.com/fairquery/company-jobs-feed
 - GitHub: https://github.com/fairquery/company-jobs-feed
-- Contact: fairquery@proton.me
+- Contact: info@getfairquery.com
 - License: MIT
