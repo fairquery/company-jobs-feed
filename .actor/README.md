@@ -36,7 +36,7 @@ Use `excludeStale`, `maxAgeDays` and `postedWithinDays` to keep only fresh listi
 
 **Measured on 2026-10-17:** Stripe (Greenhouse) 732 jobs, Palantir (Lever) 310 and Ramp (Ashby) 167, one request per board, about 1.5 s for all three. A filtered Stripe run (32 engineering jobs, 10 re-checks) took 3.1 s and cost $0.035.
 
-Full guide with free Python code and MCP examples: https://fairquery.github.io/posts/live-job-listings-api-greenhouse-lever-ashby/
+Full guide with free Python code and MCP examples: https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/
 
 ## Data sources
 
@@ -243,7 +243,7 @@ Job data comes from each employer's public ATS job board and belongs to the empl
 
 ## Links
 
-- Guide: [Live job listings API straight from company ATS boards (Greenhouse, Lever, Ashby)](https://fairquery.github.io/posts/live-job-listings-api-greenhouse-lever-ashby/)
+- Guide: [Live job listings API straight from company ATS boards (Greenhouse, Lever, Ashby)](https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/)
 - Apify Store: https://apify.com/fairquery/company-jobs-feed
 - GitHub: https://github.com/fairquery/company-jobs-feed
 - Contact: fairquery@proton.me
