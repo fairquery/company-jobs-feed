@@ -230,7 +230,12 @@ Other Fairquery tools on the Apify Store. Each one returns structured rows with 
 - [EDGAR Company Facts & Filings for Agents](https://apify.com/fairquery/edgar-company-facts-filings): SEC filings and XBRL facts by ticker, CIK or name; from $1.50 per 1,000 companies
 - **MCP server** [`@fairquery/agent-trust-mcp`](https://www.npmjs.com/package/@fairquery/agent-trust-mcp): one MCP server for Claude Desktop, Cursor and VS Code (`npx -y @fairquery/agent-trust-mcp`).
 
+- [Competitor Change Tracker: Pricing, Terms, Careers & Changelog](https://apify.com/fairquery/competitor-change-tracker): watch competitors' public pricing, terms, careers and changelog pages for real changes with plain-English summaries and webhook alerts; $0.00049 per page checked + $0.0049 per change
+
 All Fairquery Actors: https://apify.com/fairquery
+
+
+**Pair with the Competitor Change Tracker.** Use this Jobs Feed for the full, filterable list of who is hiring, and the [Competitor Change Tracker](https://apify.com/fairquery/competitor-change-tracker) to watch a competitor's pricing, terms and careers pages for changes — so you see a rival's hiring and pricing moves together.
 
 ## Disclaimer
 
