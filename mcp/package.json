@@ -1,6 +1,6 @@
 {
   "name": "@fairquery/company-jobs-feed-mcp",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "mcpName": "io.github.fairquery/company-jobs-feed-mcp",
   "description": "stdio MCP server for Fairquery Company Jobs Feed: live jobs from Greenhouse, Lever and Ashby official public APIs (free local tools + paid Apify Actor tool).",
   "type": "module",
@@ -51,9 +51,19 @@
     "lever",
     "ashby",
     "job-board-api",
-    "ats"
+    "ats",
+    "mcp-server",
+    "model-context-protocol",
+    "job-listings",
+    "job-postings",
+    "greenhouse-api",
+    "lever-api",
+    "ai-agents",
+    "claude",
+    "cursor",
+    "recruiting"
   ],
-  "homepage": "https://github.com/fairquery/company-jobs-feed/tree/main/mcp#readme",
+  "homepage": "https://fairquery.github.io/posts/live-job-listings-api-greenhouse-lever-ashby/",
   "bugs": {
     "url": "https://github.com/fairquery/company-jobs-feed/issues"
   },

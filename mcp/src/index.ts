@@ -19,7 +19,7 @@ import { buildJobRow, jobFingerprint, type RowContext } from './shared/rows.js';
 import { SEED_BOARDS } from './shared/seed.js';
 import type { Ats } from './shared/types.js';
 
-export const VERSION = '1.0.2';
+export const VERSION = '1.0.3';
 const ATS = ['greenhouse', 'lever', 'ashby'] as const;
 
 const atsSchema = z
@@ -48,7 +48,7 @@ function createServer(): McpServer {
                 'WHEN NOT: Many companies at once, history (new/closed/reposted since last run), or careers-page discovery at scale: use jobs_search_companies (paid). Unknown board: use jobs_find_board first. SmartRecruiters, LinkedIn, Workday, Workable and Recruitee are not supported and never contacted.',
                 'BEHAVIOR: Runs on your machine; one GET to the documented API host only (very large Greenhouse boards: a second, lighter GET). No token, nothing stored, no history: first_seen_at = now and change = null. Any HTTP 403/429 stops that host for the session (kill switch, HOST_BLOCKED error). Lever requests are spaced 1 s apart (its robots.txt Crawl-delay).',
                 'COST: Free.',
-                'RETURNS: Paged job rows: job_key, title, company, department, team, locations, countries (+country_basis), remote (+remote_basis), workplace_type, employment_type, compensation (only when the ATS publishes it), posted_at (ATS date or null, never guessed), age_days + age_basis, long_open, verified_open_at, apply_url, job_url, source_url, fingerprint. meta: jobs_total on the board, jobs_matched, requests, complete.',
+                'RETURNS: Paged "job" rows (fields per the output schema). compensation appears only when the ATS publishes it; posted_at is the ATS date or null (never guessed), and age_basis says how age_days was derived. meta: jobs_total on the board, jobs_matched after filters, requests, complete.',
                 'PARAMETERS: All filters are AND-ed; values inside one filter are OR-ed. titleIncludes/titleExcludes match whole words ("engineer" does not match "Engineering"). countries uses the ATS\'s structured country where present (Lever, Ashby) and a place-name list otherwise; rows without any country are dropped when countries is set. postedWithinDays drops rows with posted_at = null. Paging re-fetches the board, so pages from different calls can shift if the employer edits the board in between.',
                 'EXAMPLE: {"ats":"ashby","slug":"ramp","titleIncludes":["engineer"],"remote":"only"} -> remote engineering roles at Ramp with salary ranges.',
             ].join('\n'),
@@ -98,8 +98,8 @@ function createServer(): McpServer {
                 'WHAT: Resolve a company name, domain or careers/board URL to its public job board(s) on Greenhouse, Lever or Ashby.',
                 'WHEN: Before jobs_get_board when you only know the company ("Ramp", "sentry.io", "https://stripe.com/jobs").',
                 'WHEN NOT: You already have ats + slug (call jobs_get_board). For many companies plus their jobs in one step use jobs_search_companies (paid). It cannot find Workday, Workable, Recruitee or LinkedIn pages.',
-                'BEHAVIOR: Runs on your machine. Order: board-URL parsing -> verified starter list -> the company\'s own website (only for a domain/URL input; robots.txt respected, <= 3 pages, private/internal IPs refused) -> at most 6 GETs against the documented ATS APIs with slug guesses. Stops at the first hit. Nothing is cached or stored.',
-                'COST: Free.',
+                'BEHAVIOR: Runs on your machine. Order: board-URL parsing -> verified starter list -> the company\'s own website (only for a domain/URL input; robots.txt respected, <= 3 pages, private/internal IPs refused) -> at most 6 GETs against the documented ATS APIs with slug guesses. Stops at the first hit. Nothing is cached or stored. Rate limits: max 2 parallel requests per host, Lever spaced 1 s apart, 15 s timeout per GET; network errors and HTTP 5xx are retried at most twice with backoff (0.5-1.6 s); HTTP 403/429 is never retried: that host is skipped for the rest of the session and noted in meta.notes.',
+                'COST: No APIFY_TOKEN and no billing; worst case about 4 website requests (robots.txt + 3 pages) and 6 ATS API GETs per call.',
                 'RETURNS: Items of type "board": {ats, slug, company, domain, via (board_url | seed_list | careers_page | slug_probe), confidence (high | medium), board_url}. A slug_probe hit is "medium": the slug exists but may belong to a different company with the same name; check the jobs or pass the URL from the careers page. meta.notes lists robots/blocked/network notes.',
                 'PARAMETERS: company accepts three forms with different behavior: a board URL is parsed with no network call; a domain or https URL enables the careers-page step; a plain name only uses the starter list and slug probes.',
                 'EXAMPLE: {"company":"ramp.com"} -> [{"ats":"ashby","slug":"ramp","via":"seed_list","confidence":"high"}].',
@@ -184,7 +184,7 @@ function createServer(): McpServer {
                 'WHEN NOT: Live job data (jobs_get_board) or companies not in the list (jobs_find_board). The list is a starting point, not a global index of employers.',
                 'BEHAVIOR: Offline: reads a static list compiled into the server; no network call. jobs_at_verification is a snapshot from verified_at and goes stale.',
                 'COST: Free.',
-                'RETURNS: Paged items {type:"seed_board", company, domain, ats, slug, verified_at, verified_by, jobs_at_verification}; meta.by_ats counts.',
+                'RETURNS: Paged "seed_board" rows with the fields listed under WHAT; meta.by_ats counts boards per ATS.',
                 'PARAMETERS: ats narrows the list; omit it for all three systems. Feed ats + slug of any item straight into jobs_get_board.',
                 'EXAMPLE: {"ats":"lever"} -> Palantir, Spotify, Zoox, Ro.',
             ].join('\n'),
