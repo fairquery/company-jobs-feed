@@ -1,6 +1,6 @@
 # Changelog (@fairquery/company-jobs-feed-mcp)
 
-## 1.1.0 - unreleased (preview)
+## 1.1.0 - 2026-10-18
 - `jobs_check_open`: new optional `includeDescription` (default false). When the job is open, the open_check row gets `job`: the same full job row jobs_get_board returns (title, location, compensation, posted_at, description_text, ...); closed jobs get `job: null`. No extra request on Greenhouse and Lever (the per-job response already holds the text); on Ashby the board download includes descriptions. Without the flag the row is unchanged.
 - Smoke test (`--live`) covers Greenhouse, Ashby and a closed id with includeDescription.
 

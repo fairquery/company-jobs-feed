@@ -52,7 +52,7 @@ Docker: `docker build -t fairquery-jobs-feed-mcp . && docker run -i --rm fairque
 | --- | --- | --- |
 | `jobs_get_board` | free, local | All jobs currently published on one board (ats + slug), normalized and filtered by title, location, country, remote and posted-within. Returns `posted_at`, `age_days`, `long_open`, `verified_open_at`, apply URL |
 | `jobs_find_board` | free, local | Resolve a company name, domain or careers URL to its Greenhouse/Lever/Ashby board, with `via` and `confidence` |
-| `jobs_check_open` | free, local | Re-check one job right now: `open` or `closed` (detail endpoint; Ashby via the board listing) |
+| `jobs_check_open` | free, local | Re-check one job right now: `open` or `closed` (detail endpoint; Ashby via the board listing). With `includeDescription: true`, an open job also comes back with its full job row incl. `description_text` |
 | `jobs_list_seed_boards` | free, offline | The verified starter boards (company, domain, ats, slug, verified_at) |
 | `jobs_search_companies` | paid (Apify PPE) | Many companies at once with discovery, history (first/last seen, new/updated/closed), repost detection, optional re-checks and descriptions. Needs `APIFY_TOKEN` |
 
@@ -116,7 +116,7 @@ Other Fairquery tools on the Apify Store. Each one returns structured rows with 
 - [EDGAR Company Facts & Filings for Agents](https://apify.com/fairquery/edgar-company-facts-filings): SEC filings and XBRL facts by ticker, CIK or name; from $1.50 per 1,000 companies
 - [Competitor Change Tracker: Pricing, Terms, Careers & Changelog](https://apify.com/fairquery/competitor-change-tracker): watch competitors' public pricing, terms, careers and changelog pages for real changes with plain-English summaries and webhook alerts; $0.00049 per page checked + $0.0049 per change
 - [AI Exposure Scanner: Public Secrets, Files & AI-Crawler Policy](https://apify.com/fairquery/ai-exposure-scanner): passive, scored scan of your own domains and public GitHub repos for leaked secrets (masked), exposed files, AI-crawler policy, security headers and SPF/DMARC; $0.039 per domain + $0.0039 per repo + $0.0019 per finding
-- **MCP server** [`@fairquery/agent-trust-mcp`](https://www.npmjs.com/package/@fairquery/agent-trust-mcp): one MCP server for Claude Desktop, Cursor and VS Code (`npx -y @fairquery/agent-trust-mcp`). It has 7 free tools that need no token, plus paid tools that call the PII, email, sanctions and OSV Actors with your own Apify token.
+- **MCP server** [`@fairquery/agent-trust-mcp`](https://www.npmjs.com/package/@fairquery/agent-trust-mcp): one MCP server for Claude Desktop, Cursor and VS Code (`npx -y @fairquery/agent-trust-mcp`). It has 8 free tools that need no token, plus paid tools that call the PII, email, sanctions and OSV Actors with your own Apify token.
 
 All Fairquery Actors: https://apify.com/fairquery
 
