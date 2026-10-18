@@ -18,3 +18,5 @@ npm test   # shared-source check + smoke test (no token, no network)
 npm run build:mcpb   # -> build/fairquery-company-jobs-feed-mcp-<version>.mcpb (dist + production node_modules)
 npm run test:mcpb    # unpack, initialize, tools/list, free call, paid call without token -> APIFY_TOKEN_MISSING
 ```
+
+`build:mcpb` also writes `<name>-smithery.mcpb`, the file to upload to Smithery. It is the same bundle with only `manifest.json` changed: each tool also carries its `inputSchema`, `outputSchema` and `annotations`, taken from the server's own `tools/list`. Smithery's publish API needs these for its server card, but the MCPB 0.3 manifest schema allows only `name`/`description` per tool, so the canonical `.mcpb` keeps the spec-valid manifest. `test:mcpb` tests both bundles and checks that they differ only in those tool schemas.

@@ -23,3 +23,7 @@ OUT="build/fairquery-company-jobs-feed-mcp-${VERSION}.mcpb"
 rm -f "$OUT"
 npx --yes "$MCPB_CLI" pack "$STAGE" "$OUT"
 echo "Built $OUT"
+# Smithery upload variant: same bundle, manifest tools carry inputSchema (see scripts/smithery-bundle.mjs).
+SMITHERY_OUT="${OUT%.mcpb}-smithery.mcpb"
+rm -f "$SMITHERY_OUT"
+node scripts/smithery-bundle.mjs "$STAGE" "$OUT" "$SMITHERY_OUT"

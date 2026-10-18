@@ -22,7 +22,7 @@
     "test": "node scripts/sync-shared.mjs --check && node scripts/smoke-test.mjs && node scripts/test-token.mjs",
     "prepublishOnly": "npm run build && npm test",
     "build:mcpb": "bash scripts/build-mcpb.sh",
-    "test:mcpb": "MCPB_TEST_FREE_CALL='{\"name\":\"jobs_list_seed_boards\",\"arguments\":{\"ats\":\"lever\"}}' MCPB_TEST_PAID_CALL='{\"name\":\"jobs_search_companies\",\"arguments\":{\"companies\":[\"stripe.com\"]}}' node scripts/test-mcpb.mjs build/fairquery-company-jobs-feed-mcp-$npm_package_version.mcpb",
+    "test:mcpb": "export MCPB_TEST_FREE_CALL='{\"name\":\"jobs_list_seed_boards\",\"arguments\":{\"ats\":\"lever\"}}' MCPB_TEST_PAID_CALL='{\"name\":\"jobs_search_companies\",\"arguments\":{\"companies\":[\"stripe.com\"]}}' && node scripts/test-mcpb.mjs build/fairquery-company-jobs-feed-mcp-$npm_package_version.mcpb && node scripts/test-mcpb.mjs build/fairquery-company-jobs-feed-mcp-$npm_package_version-smithery.mcpb build/fairquery-company-jobs-feed-mcp-$npm_package_version.mcpb",
     "test:token": "node scripts/test-token.mjs"
   },
   "engines": {
