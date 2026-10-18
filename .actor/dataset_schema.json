@@ -159,9 +159,9 @@
                 "title": "Long open"
             },
             "reposted": {
-                "type": ["boolean", "integer"],
+                "type": ["boolean", "integer", "null"],
                 "title": "Reposted",
-                "description": "Job rows: boolean. Board rows: count of reposts detected."
+                "description": "Job rows: boolean. Board rows: count of reposts detected, or null when trackChanges is off (not tracked)."
             },
             "stale_signal": {
                 "type": "string",

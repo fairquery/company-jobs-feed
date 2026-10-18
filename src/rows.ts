@@ -1,6 +1,6 @@
 import { companyKey, daysBetween, fingerprint, scrubPII } from './normalize.js';
 import type { ClosedJob, JobHistory } from './state.js';
-import { type Ats, type JobRow, type NormalizedJob, SCHEMA_VERSION } from './types.js';
+import { type Ats, type BoardRef, type BoardRow, type JobRow, type NormalizedJob, SCHEMA_VERSION } from './types.js';
 
 export interface RowContext {
     nowIso: string;
@@ -114,5 +114,45 @@ export function buildClosedRow(
         merged_job_ids: [],
         source_url: ctx.sourceUrl,
         checked_at: ctx.nowIso,
+    };
+}
+
+/**
+ * One board summary row. When change tracking is off (or no history was loaded) the
+ * new/updated/closed/reposted counts are null: "not tracked", which is different from 0.
+ */
+export function buildBoardRow(p: {
+    ref: Pick<BoardRef, 'ats' | 'slug' | 'discovered_via'>;
+    company: string;
+    domain: string | null;
+    sourceUrl: string;
+    nowIso: string;
+    total: number;
+    matched: number;
+    emitted: number;
+    complete: boolean;
+    counts: { new: number; updated: number; closed: number; reposted: number } | null;
+    requests: number;
+}): BoardRow {
+    const c = p.counts;
+    return {
+        schema_version: SCHEMA_VERSION,
+        type: 'board',
+        ats: p.ref.ats,
+        board: p.ref.slug,
+        company: p.company,
+        company_domain: p.domain,
+        discovered_via: p.ref.discovered_via,
+        source_url: p.sourceUrl,
+        checked_at: p.nowIso,
+        jobs_total: p.total,
+        jobs_matched: p.matched,
+        jobs_emitted: p.emitted,
+        complete: p.complete,
+        new: c ? c.new : null,
+        updated: c ? c.updated : null,
+        closed: c ? c.closed : null,
+        reposted: c ? c.reposted : null,
+        requests: p.requests,
     };
 }

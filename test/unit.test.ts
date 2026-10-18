@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+
+import { Ajv } from 'ajv';
 import { describe, expect, it } from 'vitest';
 
 import { fetchBoard, listUrl, mapAshby, mapGreenhouse, mapLever } from '../src/ats.js';
@@ -15,11 +18,11 @@ import { countriesFromText, countryToIso2 } from '../src/gazetteer.js';
 import { AtsClient, CareersFetcher, HostGate, HttpError } from '../src/http.js';
 import { htmlToText, normTitle, scrubPII, wordMatch } from '../src/normalize.js';
 import { isAllowed, parseRobots } from '../src/robots.js';
-import { buildJobRow, jobFingerprint, type RowContext } from '../src/rows.js';
+import { buildBoardRow, buildClosedRow, buildJobRow, jobFingerprint, type RowContext } from '../src/rows.js';
 import { SEED_BOARDS } from '../src/seed.js';
 import { isPrivateAddress, unsafeUrlReason } from '../src/ssrf.js';
 import { applyHistory, type BoardState } from '../src/state.js';
-import type { NormalizedJob } from '../src/types.js';
+import type { BoardRef, NormalizedJob } from '../src/types.js';
 
 const NOW = '2026-10-17T12:00:00.000Z';
 const ctx: RowContext = {
@@ -559,5 +562,48 @@ describe('prettySlug', () => {
         expect(prettySlug('sentry')).toBe('Sentry');
         expect(prettySlug('scale-ai')).toBe('Scale Ai');
         expect(prettySlug('OpenAI')).toBe('OpenAI');
+    });
+});
+
+describe('dataset schema accepts every row shape (trackChanges on and off)', () => {
+    const ds = JSON.parse(readFileSync(new URL('../.actor/dataset_schema.json', import.meta.url), 'utf8'));
+    const validate = new Ajv({ strict: false, allErrors: true }).compile(ds.fields);
+    const ok = (row: unknown) => {
+        const valid = validate(row);
+        expect(validate.errors ?? [], JSON.stringify(row)).toEqual([]);
+        expect(valid).toBe(true);
+    };
+    const boardBase = {
+        ref: { ats: 'greenhouse' as const, slug: 'acme', discovered_via: 'input' as BoardRef['discovered_via'] },
+        company: 'Acme',
+        domain: 'example.com',
+        sourceUrl: 'https://boards-api.greenhouse.io/v1/boards/acme/jobs',
+        nowIso: NOW,
+        total: 3,
+        matched: 2,
+        emitted: 2,
+        complete: true,
+        requests: 1,
+    };
+
+    it('trackChanges false: board counts are null (not tracked) and the row validates', () => {
+        const row = buildBoardRow({ ...boardBase, counts: null });
+        expect(row.reposted).toBeNull();
+        expect(row.new).toBeNull();
+        ok(row);
+        ok(buildJobRow(job(), null, 'fp', ctx));
+    });
+
+    it('trackChanges true: board counts are integers, job reposted is boolean, closed rows validate', () => {
+        const day1 = [job({ job_id: 'a' }), job({ job_id: 'b', title: 'Designer' })];
+        const fp = (js: NormalizedJob[]) => new Map(js.map((j) => [j.job_id, jobFingerprint(j, 'example.com')]));
+        const s1 = applyHistory(null, 'greenhouse', 'acme', day1, fp(day1), '2026-10-01T00:00:00.000Z', true).state;
+        const h = applyHistory(s1, 'greenhouse', 'acme', [day1[0]], fp(day1), NOW, true);
+        const row = buildBoardRow({ ...boardBase, counts: h.counts });
+        expect(typeof row.reposted).toBe('number');
+        ok(row);
+        ok(buildJobRow(day1[0], h.perJob.get('a') ?? null, 'fp', ctx));
+        for (const c of h.closed) ok(buildClosedRow(c, { ats: 'greenhouse', board: 'acme', company: 'Acme' }, ctx));
+        expect(h.closed.length).toBe(1);
     });
 });

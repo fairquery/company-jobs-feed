@@ -14,7 +14,7 @@ import { Emitter } from './emitter.js';
 import { compileFilters, matches } from './filters.js';
 import { AtsClient, CareersFetcher, HostGate, HttpError } from './http.js';
 import { prettySlug } from './normalize.js';
-import { buildClosedRow, buildJobRow, jobFingerprint, type RowContext } from './rows.js';
+import { buildBoardRow, buildClosedRow, buildJobRow, jobFingerprint, type RowContext } from './rows.js';
 import { SEED_BOARDS } from './seed.js';
 import { applyHistory, type BoardState, type DiscoveryCacheEntry, discoveryKey, stateKey } from './state.js';
 import {
@@ -24,7 +24,6 @@ import {
     ATS_LIST,
     BOARD_CONCURRENCY,
     type BoardRef,
-    type BoardRow,
     CHARGE_EVENTS,
     type CompanyRow,
     type DedupeMode,
@@ -588,26 +587,19 @@ async function scanBoard(b: BoardRef): Promise<void> {
         });
     }
 
-    const boardRow: BoardRow = {
-        schema_version: SCHEMA_VERSION,
-        type: 'board',
-        ats: b.ats,
-        board: b.slug,
+    const boardRow = buildBoardRow({
+        ref: b,
         company,
-        company_domain: domain,
-        discovered_via: b.discovered_via,
-        source_url: fetched.sourceUrl,
-        checked_at: nowIso,
-        jobs_total: fetched.total,
-        jobs_matched: matched,
-        jobs_emitted: emitted,
+        domain,
+        sourceUrl: fetched.sourceUrl,
+        nowIso,
+        total: fetched.total,
+        matched,
+        emitted,
         complete: fetched.complete && !truncated,
-        new: hist ? hist.counts.new : null,
-        updated: hist ? hist.counts.updated : null,
-        closed: hist ? hist.counts.closed : null,
-        reposted: hist ? hist.counts.reposted : null,
+        counts: hist ? hist.counts : null,
         requests: fetched.requests,
-    };
+    });
     const boardBilled = await emitter.emit(boardRow, [CHARGE_EVENTS.board]);
     if (boardBilled) counters.boards_scanned++;
     else {
