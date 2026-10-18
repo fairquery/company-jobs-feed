@@ -8,6 +8,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -67,5 +68,7 @@ if (!pr.isError || !txt.includes('APIFY_TOKEN_MISSING')) fail(`paid tool ${paidC
 console.log(`PASS paid tool ${paidCall.name} without token -> APIFY_TOKEN_MISSING (no network call)`);
 
 await client.close();
+// Smithery-runner / MCPB-host token scenarios against the unpacked bundle itself.
+execFileSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), 'test-token.mjs'), dir], { stdio: 'inherit' });
 fs.rmSync(dir, { recursive: true, force: true });
 console.log('MCPB TEST PASS');

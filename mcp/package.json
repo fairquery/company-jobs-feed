@@ -1,6 +1,6 @@
 {
   "name": "@fairquery/company-jobs-feed-mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "mcpName": "io.github.fairquery/company-jobs-feed-mcp",
   "description": "stdio MCP server for Fairquery Company Jobs Feed: live jobs from Greenhouse, Lever and Ashby official public APIs (free local tools + paid Apify Actor tool).",
   "type": "module",
@@ -19,10 +19,11 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "smoke": "node scripts/smoke-test.mjs",
-    "test": "node scripts/sync-shared.mjs --check && node scripts/smoke-test.mjs",
+    "test": "node scripts/sync-shared.mjs --check && node scripts/smoke-test.mjs && node scripts/test-token.mjs",
     "prepublishOnly": "npm run build && npm test",
     "build:mcpb": "bash scripts/build-mcpb.sh",
-    "test:mcpb": "MCPB_TEST_FREE_CALL='{\"name\":\"jobs_list_seed_boards\",\"arguments\":{\"ats\":\"lever\"}}' MCPB_TEST_PAID_CALL='{\"name\":\"jobs_search_companies\",\"arguments\":{\"companies\":[\"stripe.com\"]}}' node scripts/test-mcpb.mjs build/fairquery-company-jobs-feed-mcp-$npm_package_version.mcpb"
+    "test:mcpb": "MCPB_TEST_FREE_CALL='{\"name\":\"jobs_list_seed_boards\",\"arguments\":{\"ats\":\"lever\"}}' MCPB_TEST_PAID_CALL='{\"name\":\"jobs_search_companies\",\"arguments\":{\"companies\":[\"stripe.com\"]}}' node scripts/test-mcpb.mjs build/fairquery-company-jobs-feed-mcp-$npm_package_version.mcpb",
+    "test:token": "node scripts/test-token.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -50,8 +50,30 @@ export function errorResult(code: string, message: string, retryable = false): T
     return { content: [{ type: 'text', text: JSON.stringify({ error: code, message, retryable }, null, 2) }], isError: true };
 }
 
+/**
+ * Normalizes a user-supplied APIFY_TOKEN. Returns undefined (treated as "missing", so paid tools return
+ * APIFY_TOKEN_MISSING) when the value is empty or is an unfilled placeholder / unsubstituted template, e.g.
+ * '', '${user_config.apify_token}' (MCPB/Smithery runners leave this when the optional setting is blank),
+ * '<your-apify-token>', '{{APIFY_TOKEN}}', '$APIFY_TOKEN', '%APIFY_TOKEN%', 'undefined', 'null'.
+ * The value itself is never logged or returned to the client.
+ */
+export function normalizeApifyToken(raw: string | undefined | null): string | undefined {
+    if (raw == null) return undefined;
+    let v = String(raw).trim();
+    // Strip one layer of matching surrounding quotes ("..." or '...') left by some config UIs.
+    if (v.length >= 2 && (v[0] === '"' || v[0] === "'") && v[v.length - 1] === v[0]) v = v.slice(1, -1).trim();
+    if (!v) return undefined;
+    if (v.includes('${') || v.includes('{{') || v.includes('}}')) return undefined; // unsubstituted template
+    if (/^<[^>]*>$/.test(v)) return undefined; // <your-apify-token>
+    if (/^\$[A-Za-z_][A-Za-z0-9_]*$/.test(v)) return undefined; // $APIFY_TOKEN (unexpanded shell var)
+    if (/^%[A-Za-z_][A-Za-z0-9_]*%$/.test(v)) return undefined; // %APIFY_TOKEN% (unexpanded Windows var)
+    if (/^(undefined|null|none|nil|false|0|changeme|your[-_ ]?(apify[-_ ]?)?(api[-_ ]?)?token|apify[-_]token)$/i.test(v)) return undefined;
+    if (/\s/.test(v)) return undefined; // tokens never contain whitespace; e.g. "paste your token here"
+    return v;
+}
+
 export function getToken(): string | undefined {
-    return process.env.APIFY_TOKEN?.trim() || undefined;
+    return normalizeApifyToken(process.env.APIFY_TOKEN);
 }
 
 export const MISSING_TOKEN_MESSAGE =
