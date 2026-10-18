@@ -19,7 +19,7 @@ import { buildJobRow, jobFingerprint, type RowContext } from './shared/rows.js';
 import { SEED_BOARDS } from './shared/seed.js';
 import type { Ats } from './shared/types.js';
 
-export const VERSION = '1.0.5';
+export const VERSION = '1.0.6';
 const ATS = ['greenhouse', 'lever', 'ashby'] as const;
 
 const atsSchema = z
@@ -46,9 +46,9 @@ function createServer(): McpServer {
                 'WHAT: Fetch every job currently published on ONE company board from its official public ATS API (Greenhouse, Lever or Ashby), normalize it and filter it locally.',
                 'WHEN: You know the board (ats + slug), e.g. from jobs_find_board or a careers-page link, and want its live openings now.',
                 'WHEN NOT: Many companies at once, history (new/closed/reposted since last run), or careers-page discovery at scale: use jobs_search_companies (paid). Unknown board: use jobs_find_board first. SmartRecruiters, LinkedIn, Workday, Workable and Recruitee are not supported and never contacted.',
-                'BEHAVIOR: Runs on your machine; one GET to the documented API host only (very large Greenhouse boards: a second, lighter GET). No token, nothing stored, no history: first_seen_at = now and change = null. Any HTTP 403/429 stops that host for the session (kill switch, HOST_BLOCKED error). Lever requests are spaced 1 s apart (its robots.txt Crawl-delay).',
-                'COST: Free.',
-                'RETURNS: Paged "job" rows. compensation only when the ATS publishes it; posted_at is the ATS date or null (never guessed); age_basis says how age_days was derived. meta: jobs_total, jobs_matched, requests, complete.',
+                'BEHAVIOR: Runs on your machine; one GET to the documented API host only (very large Greenhouse boards: a second, lighter GET). Nothing stored, no history: first_seen_at = now and change = null. Any HTTP 403/429 stops that host for the session (kill switch, HOST_BLOCKED error). Lever requests are spaced 1 s apart (its robots.txt Crawl-delay).',
+                'COST: No APIFY_TOKEN, no billing.',
+                'RETURNS: Paged "job" rows. compensation only when the ATS publishes it; posted_at is the ATS date or null (never guessed); age_basis says how age_days was derived.',
                 'PARAMETERS: All filters are AND-ed; values inside one filter are OR-ed. titleIncludes/titleExcludes match whole words ("engineer" does not match "Engineering"). countries uses the ATS\'s structured country where present (Lever, Ashby) and a place-name list otherwise; rows without any country are dropped when countries is set. postedWithinDays drops rows with posted_at = null. Paging re-fetches the board, so pages from different calls can shift if the employer edits the board in between.',
                 'EXAMPLE: {"ats":"ashby","slug":"ramp","titleIncludes":["engineer"],"remote":"only"} -> remote engineering roles at Ramp with salary ranges.',
             ].join('\n'),
@@ -100,8 +100,8 @@ function createServer(): McpServer {
                 'WHEN NOT: You already have ats + slug (call jobs_get_board). For many companies plus their jobs in one step use jobs_search_companies (paid). It cannot find Workday, Workable, Recruitee or LinkedIn pages.',
                 'BEHAVIOR: Runs on your machine. Order: board-URL parsing -> verified starter list -> the company\'s own website (only for a domain/URL input; robots.txt respected, <= 3 pages, private/internal IPs refused) -> at most 6 GETs against the documented ATS APIs with slug guesses. Stops at the first hit. Nothing is cached or stored. Rate limits: max 2 parallel requests per host, Lever spaced 1 s apart, 15 s timeout per GET; ATS API network errors and HTTP 5xx are retried at most twice with backoff (0.5-1.6 s). Any HTTP 403/429 (or an HTML block page from an ATS API) stops that host for the session (kill switch, never retried, also for the other free tools): the call does not fail but adds a HOST_BLOCKED note to meta.notes, stops the careers-page step when the company site is blocked, and skips later slug probes on a stopped ATS host without sending them.',
                 'COST: No APIFY_TOKEN and no billing; worst case about 4 website requests (robots.txt + 3 pages) and 6 ATS API GETs per call.',
-                'RETURNS: Items of type "board": {ats, slug, company, domain, via (board_url | seed_list | careers_page | slug_probe), confidence (high | medium), board_url}. A slug_probe hit is "medium": the slug exists but may belong to a different company with the same name; check the jobs or pass the URL from the careers page. meta.notes lists robots/blocked/network notes.',
-                'PARAMETERS: company accepts three forms with different behavior: a board URL is parsed with no network call; a domain or https URL enables the careers-page step; a plain name only uses the starter list and slug probes.',
+                'RETURNS: "board" rows, or one NO_BOARD_FOUND error row. via (board_url | seed_list | careers_page | slug_probe) says how the board was found; confidence is "high" except for slug_probe hits ("medium": the slug exists but may belong to a different company with the same name, so check the jobs or pass the URL from the careers page).',
+                'PARAMETERS: company accepts three forms with different behavior: a board URL is parsed with no network call; a domain or https URL enables the careers-page step; a plain name only uses the starter list and slug probes. Slug guesses for a name drop legal suffixes and "the" (Inc, LLC, Ltd, GmbH, Corp, Co, PLC, AG, SA, BV) and try the joined words, the hyphenated words and the first word; probes run Greenhouse, Lever, Ashby in that order and the first hit wins, so an ambiguous name returns at most one medium-confidence board. A starter-list match can return several boards (all high).',
                 'EXAMPLE: {"company":"ramp.com"} -> [{"ats":"ashby","slug":"ramp","via":"seed_list","confidence":"high"}].',
             ].join('\n'),
             inputSchema: {
@@ -130,11 +130,11 @@ function createServer(): McpServer {
             description: [
                 'WHAT: Re-check ONE job on the employer\'s ATS right now and report open or closed.',
                 'WHEN: Before applying, alerting or contacting about a specific job you got earlier (job_key or ats + slug + jobId).',
-                'WHEN NOT: Listing jobs (jobs_get_board) or checking many jobs at once (jobs_search_companies with confirmOpen, paid).',
+                'WHEN NOT: Listing jobs (jobs_get_board) or checking many jobs at once (jobs_search_companies with confirmOpen, paid). Full text of one job: jobs_get_board with includeDescription=true (free), then pick the row by job_key.',
                 'BEHAVIOR: Greenhouse, Lever: one GET to the documented per-job endpoint; HTTP 404 = closed. Ashby has no per-job endpoint, so the whole board is fetched once and searched for the id (method "board_listing"). "open" means currently published by the employer; it does not prove the role is still being filled.',
-                'COST: Free.',
-                'RETURNS: One item {type:"open_check", ats, slug, job_id, status: open | closed, method: detail_endpoint | board_listing, checked_at, source_url} or an error item (HOST_BLOCKED, NETWORK_ERROR: retryable).',
-                'PARAMETERS: Give either jobKey alone, or ats + slug + jobId; jobKey wins when both are given. A malformed jobKey, or neither form complete, returns INVALID_INPUT without a request.',
+                'COST: No APIFY_TOKEN, no billing.',
+                'RETURNS: One "open_check" row, or a tool error: INVALID_INPUT, BOARD_NOT_FOUND, HOST_BLOCKED or NETWORK_ERROR (the last two retryable).',
+                'PARAMETERS: Give either jobKey alone, or ats + slug + jobId; jobKey wins when both are given. A malformed jobKey, or neither form complete, returns INVALID_INPUT without a request. An Ashby id costs one full board download (the same request as jobs_get_board); on Greenhouse and Lever a 404 triggers one extra board request so a closed job (status closed) is told apart from a missing board (BOARD_NOT_FOUND).',
                 'EXAMPLE: {"jobKey":"greenhouse:stripe:8172503"} -> {"status":"open","method":"detail_endpoint"}.',
             ].join('\n'),
             inputSchema: {
@@ -187,14 +187,14 @@ function createServer(): McpServer {
                 'WHEN: To pick companies to scan, or to know which names jobs_find_board resolves instantly.',
                 'WHEN NOT: Live job data (jobs_get_board) or companies not in the list (jobs_find_board). The list is a starting point, not a global index of employers.',
                 'BEHAVIOR: Offline: reads a static list compiled into the server; no network call. jobs_at_verification is a snapshot from verified_at and goes stale.',
-                'COST: Free.',
-                'RETURNS: Paged "seed_board" rows; meta.by_ats counts the whole list per ATS (unfiltered).',
-                'PARAMETERS: ats narrows the list; omit it for all three systems. Feed ats + slug of any item straight into jobs_get_board.',
+                'COST: No APIFY_TOKEN, no billing.',
+                'RETURNS: Paged "seed_board" rows in the fixed bundled order (grouped by ATS, so offsets are stable).',
+                'PARAMETERS: ats narrows the list; omit it for all three systems. meta.by_ats always counts the whole list per ATS and ignores ats, so take paging totals from total. Feed ats + slug of any item straight into jobs_get_board.',
                 'EXAMPLE: {"ats":"lever"} -> Palantir, Spotify, Zoox, Ro.',
             ].join('\n'),
             inputSchema: {
                 ats: z.enum(ATS).optional().describe('Optional filter: "greenhouse" | "lever" | "ashby"; default all'),
-                limit: limitSchema,
+                limit: z.number().int().min(1).max(500).optional().describe('Optional page size, integer 1-500, default 100'),
                 offset: offsetSchema,
             },
             outputSchema: pagedOutputSchema,
@@ -217,7 +217,7 @@ function createServer(): McpServer {
                 'WHEN: Monitoring a company list ("what is new since yesterday?"), searching the verified starter list, or anything that needs history, closed/repost signals or more than a few boards.',
                 'WHEN NOT: One board right now (jobs_get_board, free) or one job (jobs_check_open, free).',
                 'BEHAVIOR: Read-only on job sites; requires APIFY_TOKEN and runs in YOUR Apify account (waits up to 300 s; history is kept in a named key-value store there). Same politeness rules as the free tools: documented ATS APIs only, 403/429 kill switch, robots.txt on careers pages.',
-                'COST: Paid, pay-per-event, billed to your Apify account: $0.00099 per job row, $0.0005 per board scanned, $0.00029 per re-check (confirmOpen), $0.0019 per company found by discovery; no start fee. Error, closed and merged rows are free. Example: 3 boards, 300 jobs = about $0.30. maxJobs caps the job rows.',
+                'COST: Paid, pay-per-event, billed to your Apify account: $0.00099 per job row, $0.0005 per board scanned, $0.00029 per re-check (confirmOpen), $0.0019 per company found by discovery; no start fee. Error, closed and merged rows are free. Example: 3 boards, 300 jobs = about $0.30.',
                 'RETURNS: Paged dataset rows: "job" rows (as jobs_get_board plus first_seen_at, last_seen_at, change, reposted, repost_of, stale_signal, duplicate_of), one "board" row per board (jobs_total, new, updated, closed), "company" rows for discovery, "error" rows (code, message, retryable).',
                 'PARAMETERS: companies, boards and useSeedList: at least one is required although the schema marks all optional (none -> INPUT_EMPTY, not billed). onlyNew implies history and compares with the last run that used the same stateStoreName, so use one name per saved search; the first run returns everything as new. limit/offset page the returned rows locally; every call starts a new billed run, so fetch the pages you need from one result instead of re-calling.',
                 'EXAMPLE: {"companies":["stripe.com","ramp.com"],"titleIncludes":["engineer"],"countries":["US"],"onlyNew":true}.',

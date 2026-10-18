@@ -1,5 +1,12 @@
 # Changelog (@fairquery/company-jobs-feed-mcp)
 
+## 1.0.6 - 2026-10-18
+- Tool descriptions only (Glama conciseness pass; no behavior, input, limit or price changes):
+  - All tools: "free" / no-token statements appear once (COST); RETURNS no longer repeats field lists that `outputSchema` defines.
+  - `jobs_find_board`: RETURNS explains `via` / `confidence` and `NO_BOARD_FOUND`; PARAMETERS documents the company-name candidates (legal suffixes such as inc/llc/gmbh/plc stripped), probe order greenhouse -> lever -> ashby (first hit wins) and that a starter-list hit can return several high-confidence boards.
+  - `jobs_check_open`: WHEN NOT points to `jobs_get_board` with `includeDescription=true` for a job's full text; RETURNS lists `INVALID_INPUT`, `BOARD_NOT_FOUND`, `HOST_BLOCKED`, `NETWORK_ERROR`; PARAMETERS notes the full-board download on Ashby and the extra board request after a Greenhouse/Lever 404.
+  - `jobs_list_seed_boards`: RETURNS states the fixed bundled order grouped by ATS (34 Greenhouse, 4 Lever, 13 Ashby); `meta.by_ats` ignores the `ats` filter. Fix: the `limit` default is documented as 100 (the code default; the text said 50).
+
 ## 1.0.5 - 2026-10-18
 - Tool descriptions only (no behavior, input, limit or price changes):
   - `jobs_check_open`: `ats`, `slug` and `jobId` now say "Required unless jobKey is given" (the schema keeps them optional because `jobKey` can replace them) and spell out the formats: `jobKey` = `"{ats}:{slug}:{job_id}"` with lowercase ats, slug charset/length, numeric Greenhouse ids vs. UUIDs on Lever/Ashby; a malformed `jobKey` returns `INVALID_INPUT`.
