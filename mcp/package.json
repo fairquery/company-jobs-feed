@@ -1,11 +1,11 @@
 {
   "name": "@fairquery/company-jobs-feed-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "mcpName": "io.github.fairquery/company-jobs-feed-mcp",
   "description": "stdio MCP server for Fairquery Company Jobs Feed: live jobs from Greenhouse, Lever and Ashby official public APIs (free local tools + paid Apify Actor tool).",
   "type": "module",
   "bin": {
-    "company-jobs-feed-mcp": "./dist/index.js"
+    "company-jobs-feed-mcp": "dist/index.js"
   },
   "files": [
     "dist",
