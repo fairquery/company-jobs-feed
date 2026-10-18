@@ -238,6 +238,7 @@ Job data comes from each employer's public ATS job board and belongs to the empl
 
 ## Links
 
+- Guide: [Live job listings API straight from company ATS boards (Greenhouse, Lever, Ashby)](https://fairquery.github.io/posts/live-job-listings-api-greenhouse-lever-ashby/)
 - Apify Store: https://apify.com/fairquery/company-jobs-feed
 - GitHub: https://github.com/fairquery/company-jobs-feed
 - Contact: fairquery@proton.me
