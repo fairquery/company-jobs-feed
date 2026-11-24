@@ -1,0 +1,19 @@
+{
+    "$schema": "https://apify.com/schemas/v1/key_value_store.ide.json",
+    "actorKeyValueStoreSchemaVersion": 1,
+    "title": "Company Jobs Feed key-value store",
+    "collections": {
+        "runSummary": {
+            "title": "Run summary",
+            "description": "Counts, events, requests per host, stopped hosts and echoed input for the run.",
+            "key": "RUN_SUMMARY",
+            "contentTypes": ["application/json"]
+        },
+        "duplicateGroups": {
+            "title": "Duplicate groups",
+            "description": "fingerprint -> job_keys for every fingerprint seen more than once in this run.",
+            "key": "DUPLICATE_GROUPS",
+            "contentTypes": ["application/json"]
+        }
+    }
+}

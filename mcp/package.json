@@ -1,0 +1,79 @@
+{
+  "name": "@fairquery/company-jobs-feed-mcp",
+  "version": "1.1.19",
+  "mcpName": "com.getfairquery/company-jobs-feed-mcp",
+  "description": "COMING SOON: indexed Jobs search (faster, 8,700+ boards). Get 8,700+ boards free with Apify's $5 starter credit. Free stdio MCP tools for live Greenhouse, Lever and Ashby boards plus named Personio, Pinpoint and Gem feeds (135-board starter list, unchanged budgets). jobs_search_companies is temporarily offline until indexed search ships.",
+  "type": "module",
+  "bin": {
+    "company-jobs-feed-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "sync": "node scripts/sync-shared.mjs",
+    "sync:check": "node scripts/sync-shared.mjs --check",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "smoke": "node scripts/smoke-test.mjs",
+    "test": "node scripts/sync-shared.mjs --check && node scripts/smoke-test.mjs && node scripts/test-get-job.mjs && node scripts/test-token.mjs",
+    "prepublishOnly": "npm run build && npm test",
+    "build:mcpb": "bash scripts/build-mcpb.sh",
+    "test:mcpb": "export MCPB_TEST_FREE_CALL='{\"name\":\"jobs_list_seed_boards\",\"arguments\":{\"ats\":\"lever\"}}' MCPB_TEST_PAID_CALL='{\"name\":\"jobs_search_companies\",\"arguments\":{\"companies\":[\"stripe.com\"]}}' && node scripts/test-mcpb.mjs build/fairquery-company-jobs-feed-mcp-$npm_package_version.mcpb && node scripts/test-mcpb.mjs build/fairquery-company-jobs-feed-mcp-$npm_package_version-smithery.mcpb build/fairquery-company-jobs-feed-mcp-$npm_package_version.mcpb",
+    "test:token": "node scripts/test-token.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^4.6.6"
+  },
+  "overrides": {
+    "body-parser": "^2.4.0",
+    "fast-uri": "^3.1.9"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  },
+  "author": {
+    "name": "Fairquery",
+    "email": "info@getfairquery.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "jobs",
+    "greenhouse",
+    "lever",
+    "ashby",
+    "personio",
+    "pinpoint",
+    "gem",
+    "job-board-api",
+    "ats",
+    "mcp-server",
+    "model-context-protocol",
+    "job-listings",
+    "job-postings",
+    "greenhouse-api",
+    "lever-api",
+    "ai-agents",
+    "claude",
+    "cursor",
+    "recruiting"
+  ],
+  "homepage": "https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/",
+  "bugs": {
+    "email": "info@getfairquery.com",
+    "url": "https://getfairquery.com/tools/"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

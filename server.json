@@ -1,0 +1,40 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.getfairquery/company-jobs-feed-mcp",
+  "title": "Fairquery Company Jobs Feed",
+  "description": "COMING SOON: indexed search, 8,700+ boards. Apify $5 credit. Free 135-board scan.",
+  "websiteUrl": "https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/",
+  "version": "1.1.19",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@fairquery/company-jobs-feed-mcp",
+      "version": "1.1.19",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "APIFY_TOKEN",
+          "description": "Optional. Create an Apify API token at https://console.apify.com/settings/integrations for when indexed Jobs search ships. Get 8,700+ boards free with Apify's $5 starter credit. jobs_search_companies is temporarily offline and does not bill your account. Leave empty to use the free tools.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.getfairquery.com/jobs/mcp"
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "previousName": "io.github.fairquery/company-jobs-feed-mcp",
+      "movedReason": "Re-anchored on the getfairquery.com domain namespace (HTTP auth); GitHub-namespace entry is no longer maintained.",
+      "contact": "info@getfairquery.com"
+    }
+  }
+}

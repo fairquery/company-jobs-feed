@@ -1,0 +1,22 @@
+{
+    "$schema": "https://apify.com/schemas/v1/output.ide.json",
+    "actorOutputSchemaVersion": 1,
+    "title": "Company Jobs Feed output",
+    "properties": {
+        "dataset": {
+            "type": "string",
+            "title": "Dataset (job / board / company / error rows)",
+            "template": "{{links.apiDefaultDatasetUrl}}/items"
+        },
+        "runSummary": {
+            "type": "string",
+            "title": "Run summary (key-value store)",
+            "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/RUN_SUMMARY"
+        },
+        "duplicateGroups": {
+            "type": "string",
+            "title": "Duplicate groups (key-value store)",
+            "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/DUPLICATE_GROUPS"
+        }
+    }
+}

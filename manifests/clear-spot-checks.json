@@ -1,0 +1,67 @@
+{
+  "verified_count": 7137,
+  "target": 8854,
+  "ratio": "7137/8854",
+  "spots": [
+    {
+      "ats": "greenhouse",
+      "slug": "andurilindustries",
+      "url": "https://boards-api.greenhouse.io/v1/boards/andurilindustries/jobs",
+      "http_status": 200,
+      "jobs": 2562,
+      "company": "Anduril Industries",
+      "title_sample": [
+        "2026 Early Career Electrical Engineer",
+        "2026 Early Career Manufacturing Engineer",
+        "2026 Early Career Mechanical Engineer",
+        "2026 Early Career Software Engineer",
+        "2027 Business Operations Engineer Intern"
+      ],
+      "title_keyword": "engineer",
+      "title_keyword_hits": 1517,
+      "used_embed": false,
+      "used_content_param": false,
+      "elapsed_ms": 122
+    },
+    {
+      "ats": "greenhouse",
+      "slug": "spacex",
+      "url": "https://boards-api.greenhouse.io/v1/boards/spacex/jobs",
+      "http_status": 200,
+      "jobs": 2874,
+      "company": "SpaceX",
+      "title_sample": [
+        "Accountant",
+        "Account Lead, Starlink Strategic Connectivity",
+        "Account Lead, Starlink Strategic Connectivity",
+        "Account Manager, Starlink Strategic Connectivity",
+        "Account Manager, Starlink Strategic Connectivity"
+      ],
+      "title_keyword": "engineer",
+      "title_keyword_hits": 1415,
+      "used_embed": false,
+      "used_content_param": false,
+      "elapsed_ms": 106
+    },
+    {
+      "ats": "lever",
+      "slug": "veeva",
+      "url": "https://api.lever.co/v0/postings/veeva?mode=json",
+      "http_status": 200,
+      "jobs": 892,
+      "company": null,
+      "title_sample": [
+        "Account Director",
+        "Account Manager - LearnGxP",
+        "Account Manager - LearnGxP",
+        "Account Manager - LearnGxP",
+        "Account Partner"
+      ],
+      "title_keyword": "manager",
+      "title_keyword_hits": 231,
+      "used_embed": false,
+      "used_content_param": false,
+      "elapsed_ms": 547
+    }
+  ]
+}

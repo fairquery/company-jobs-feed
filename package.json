@@ -1,0 +1,49 @@
+{
+    "name": "company-jobs-feed",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "Live, open jobs from companies' own hiring systems (Greenhouse, Lever, Ashby, Personio, Pinpoint, and Gem when you name the account, subdomain or vanity) via their official public job-board APIs, with freshness, age and repost signals (Fairquery).",
+    "engines": {
+        "node": ">=20"
+    },
+    "dependencies": {
+        "apify": "^3.7.0"
+    },
+    "devDependencies": {
+        "@apify/eslint-config": "^2.0.0",
+        "@apify/tsconfig": "^0.2.0",
+        "@types/node": "^24.0.0",
+        "ajv": "^8.20.0",
+        "eslint": "^9.29.0",
+        "eslint-config-prettier": "^10.1.5",
+        "globals": "^17.0.0",
+        "knip": "6.44.1",
+        "tsx": "^4.20.3",
+        "typescript": "^5.8.0",
+        "typescript-eslint": "^8.58.0",
+        "vitest": "^4.1.12"
+    },
+    "scripts": {
+        "start": "npm run start:dev",
+        "start:prod": "node dist/main.js",
+        "start:dev": "tsx src/main.ts",
+        "build": "tsc",
+        "lint": "eslint",
+        "test": "vitest run",
+        "verify-seed": "tsx scripts/verify-seed.ts",
+        "clear-manifest": "tsx scripts/clear-manifest.ts",
+        "mcp:build": "npm --prefix mcp ci --ignore-scripts && npm --prefix mcp run build",
+        "mcp:test": "npm --prefix mcp test",
+        "ccp-checker": "semgrep scan --metrics=off --disable-version-check --config semgrep --error --quiet --no-git-ignore src",
+        "clang-static": "tsc --noEmit && eslint src --max-warnings 0",
+        "sanitizers": "npm test && npm audit --audit-level=high",
+        "unused-symbol": "node scripts/check-mcp-surface.mjs && knip",
+        "gates": "npm run ccp-checker && npm run clang-static && npm run sanitizers && npm run unused-symbol"
+    },
+    "author": "Fairquery",
+    "license": "MIT",
+    "overrides": {
+        "basic-ftp": "^6.2.3",
+        "follow-redirects": "1.16.2"
+    }
+}

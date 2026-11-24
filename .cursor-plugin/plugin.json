@@ -1,0 +1,15 @@
+{
+  "name": "fairquery-company-jobs-feed",
+  "displayName": "Fairquery Company Jobs Feed",
+  "version": "1.1.1",
+  "description": "COMING SOON: indexed Jobs search (faster, 8,700+ boards). Get 8,700+ boards free with Apify's $5 starter credit. Free local Greenhouse, Lever and Ashby tools (135-board starter list). jobs_search_companies is temporarily offline.",
+  "author": {
+    "name": "Fairquery",
+    "email": "info@getfairquery.com"
+  },
+  "homepage": "https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/",
+  "repository": "https://github.com/fairquery/company-jobs-feed",
+  "license": "MIT",
+  "keywords": ["mcp", "jobs", "job-listings", "greenhouse", "lever", "ashby", "recruiting"],
+  "logo": "mcp/assets/icon.png"
+}

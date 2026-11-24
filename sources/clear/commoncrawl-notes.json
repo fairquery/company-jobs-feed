@@ -1,0 +1,13 @@
+{
+  "notes": [
+    "ok job-boards.greenhouse.io/* page 0 bytes 1257457",
+    "fail job-boards.greenhouse.io/* page 1: CDX job-boards.greenhouse.io/* page 1 HTTP 502",
+    "ok job-boards.greenhouse.io/* page 2 bytes 1298340",
+    "ok job-boards.greenhouse.io/* page 3 bytes 1333848",
+    "ok job-boards.greenhouse.io/* page 4 bytes 11102",
+    "ok jobs.ashbyhq.com/* page 0 bytes 462323",
+    "ok boards.greenhouse.io/* page 0 bytes 1565207",
+    "fail jobs.lever.co/* page 0: CDX jobs.lever.co/* page 0 HTTP 504",
+    "added jobs.lever.co/* CC-MAIN-2026-39 page 0 (7159 bytes, 27 board slugs besides robots.txt); CC-MAIN-2026-43 lever query HTTP 504"
+  ]
+}

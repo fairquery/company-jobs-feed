@@ -1,0 +1,56 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/main/dist/mcpb-manifest-v0.3.schema.json",
+  "manifest_version": "0.3",
+  "name": "fairquery-company-jobs-feed-mcp",
+  "display_name": "Fairquery Company Jobs Feed",
+  "version": "1.1.19",
+  "description": "COMING SOON: indexed Jobs search (faster, 8,700+ boards). Get 8,700+ boards free with Apify's $5 starter credit. Free local tools for Greenhouse, Lever, Ashby, and named Personio, Pinpoint and Gem feeds. jobs_search_companies is temporarily offline.",
+  "long_description": "Indexed Jobs search is COMING SOON: faster and more comprehensive than the free 135-board live scan. Indexed search covers 8,700+ boards. Get 8,700+ boards free with Apify's $5 starter credit: create an Apify account and an API token at https://console.apify.com/settings/integrations. jobs_search_companies is temporarily offline until that release and does not run the old paid Actor fairquery/company-jobs-feed (this call is not billed). Runs on your machine over stdio. Free tools need no account or token and call the official public job-board APIs of Greenhouse, Lever and Ashby, Personio's documented XML feed, Pinpoint's documented postings.json feed, and Gem's documented job_posts list for a name you supply, directly from your machine (board name and job IDs are sent to those ATS APIs): fetch and filter one board, fetch one published job's full detail, find a company's board, re-check whether a job is still open, list a bundled starter set of 135 verified boards, and search that starter list by place. Free limits are unchanged. Personio, Pinpoint and Gem are never discovered. Gem rows link out to jobs.gem.com and do not copy the ad. Fairquery code sends nothing to Fairquery. Keep the Apify token for when indexed search returns.",
+  "author": {
+    "name": "Fairquery",
+    "email": "info@getfairquery.com",
+    "url": "https://getfairquery.com/"
+  },
+  "homepage": "https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/",
+  "documentation": "https://getfairquery.com/posts/live-job-listings-api-greenhouse-lever-ashby/",
+  "support": "https://getfairquery.com/tools/",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "APIFY_TOKEN": "${user_config.apify_token}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "jobs_get_board", "description": "Free. Fetch every job on one company board from its official public Greenhouse, Lever or Ashby API, or from a Personio, Pinpoint or Gem feed you name, normalized and filtered locally. Pinpoint and Gem rows link out and omit the ad body." },
+    { "name": "jobs_find_board", "description": "Free. Resolve a company name, domain or careers/board URL to its public Greenhouse, Lever or Ashby board(s). A Personio, Pinpoint or Gem URL is parsed locally and not discovered." },
+    { "name": "jobs_check_open", "description": "Free. Re-check one job on the employer's ATS right now and report open or closed." },
+    { "name": "jobs_get_job", "description": "Free. Fetch one published job's full detail from its official Greenhouse, Lever or Ashby API, or from a named Personio, Pinpoint or Gem feed. Pinpoint and Gem rows link out and omit the ad body." },
+    { "name": "jobs_list_seed_boards", "description": "Free (offline). List the bundled starter set of company boards verified on their official ATS APIs." },
+    { "name": "jobs_search_by_location", "description": "Free. Jobs by place and role on the 135-board starter list (may be partial; pass boardCursor). Indexed search covering 8,700+ boards is COMING SOON. Get 8,700+ boards free with Apify's $5 starter credit (console.apify.com/settings/integrations)." },
+    { "name": "jobs_search_companies", "description": "COMING SOON / temporarily offline. Does not run the old paid Actor and is not billed. Indexed search will cover 8,700+ boards. Set up an Apify token at console.apify.com/settings/integrations. Use the free tools meanwhile." }
+  ],
+  "tools_generated": false,
+  "keywords": ["jobs", "greenhouse", "lever", "ashby", "personio", "pinpoint", "gem", "job-board-api", "ats", "recruiting"],
+  "license": "MIT",
+  "privacy_policies": ["https://getfairquery.com/privacy/"],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": { "node": ">=20.0.0" }
+  },
+  "user_config": {
+    "apify_token": {
+      "type": "string",
+      "title": "Apify API token (optional)",
+      "description": "Optional. Create an Apify API token at https://console.apify.com/settings/integrations for when indexed Jobs search returns. Get 8,700+ boards free with Apify's $5 starter credit. jobs_search_companies is temporarily offline and does not bill your account. Leave empty to use the free tools (135 starter boards).",
+      "sensitive": true,
+      "required": false,
+      "default": ""
+    }
+  }
+}

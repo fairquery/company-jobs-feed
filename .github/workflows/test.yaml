@@ -1,0 +1,25 @@
+name: CI
+
+on:
+    pull_request:
+    push:
+        branches: [main, master]
+
+jobs:
+    build-and-test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 24
+                  cache: npm
+            - run: npm ci
+            - run: npm run build
+            - run: npm test
+            - run: npx eslint src
+            - run: npm --prefix mcp ci --ignore-scripts
+            - run: npm --prefix mcp run build
+            - run: npm --prefix mcp test
+            - run: npm --prefix mcp run build:mcpb
+            - run: npm --prefix mcp run test:mcpb

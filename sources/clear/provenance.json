@@ -1,0 +1,32 @@
+{
+    "retrieved_at": "2026-11-01",
+    "directory": {
+        "name": "groundtruthtools/ats-jobs-mcp directory.json",
+        "url": "https://github.com/groundtruthtools/ats-jobs-mcp",
+        "raw_url": "https://raw.githubusercontent.com/groundtruthtools/ats-jobs-mcp/1b840c47cfad/src/ats_jobs_mcp/directory.json",
+        "git_commit": "1b840c47cfad",
+        "file_commit": "1b70d407986f",
+        "path_in_upstream": "src/ats_jobs_mcp/directory.json",
+        "sha256": "ef84af06db88355a6fae395e406b670652da00e447c6624b28de5eacee46402b",
+        "license": "MIT",
+        "license_sha256": "c634ee2632b95c586b07d2b6bf699a2488912b015bae67a23694cf482cf33981",
+        "copyright": "Copyright (c) 2026 Ground Truth",
+        "local_file": "sources/clear/groundtruthtools-directory.json",
+        "upstream_note": "Every row was confirmed against the applicant-tracking system's own public API on the date shown. Common Crawl was used to find candidate slugs and no fact here comes from it.",
+        "use": "Greenhouse and Ashby board tokens only, as candidates. This pipeline re-verifies every token with its own public GET. Job text from that project is not copied. Their hosted API at companyfacts.dev is not called."
+    },
+    "rejected": [
+        {
+            "name": "Riley Dorrington company datasets (CC BY-NC 4.0), including the copy vendored in saeedkolivand/ai-job-hunter-app ats-slugs",
+            "why": "Non-commercial license. Fairquery's index is a commercial product. Not downloaded."
+        },
+        {
+            "name": "SimplifyJobs internship READMEs and listings.json",
+            "why": "No license file. Not copied."
+        },
+        {
+            "name": "orbifetch/ats-jobs-search and TheirStack",
+            "why": "Competitor indexes. Not fetched, scraped, or purchased. The 8854 figure is the rival's own published Greenhouse+Ashby+Lever board count from 2026-09-27, used only as a parity ceiling."
+        }
+    ]
+}

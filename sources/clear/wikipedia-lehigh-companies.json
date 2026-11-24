@@ -1,0 +1,180 @@
+{
+  "retrieved_at": "2026-11-01",
+  "license": "Wikipedia text is CC BY-SA 4.0. This file stores page titles only (names), not article text.",
+  "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "api": "https://en.wikipedia.org/w/api.php",
+  "method": "categorymembers of Companies based in Lehigh Valley / Lehigh County / Northampton County / Allentown / Bethlehem, plus subcategories whose title starts with \"Companies based\"",
+  "categories": [
+    "Category:Companies based in Allentown, Pennsylvania",
+    "Category:Companies based in Bethlehem, Pennsylvania",
+    "Category:Companies based in Lehigh County, Pennsylvania",
+    "Category:Companies based in Northampton County, Pennsylvania",
+    "Category:Companies based in the Lehigh Valley"
+  ],
+  "companies": [
+    {
+      "company": "Lehigh Valley Health Network",
+      "category": "Category:Companies based in the Lehigh Valley"
+    },
+    {
+      "company": "Air Products",
+      "category": "Category:Companies based in Lehigh County, Pennsylvania"
+    },
+    {
+      "company": "Allen Organ Company",
+      "category": "Category:Companies based in Lehigh County, Pennsylvania"
+    },
+    {
+      "company": "Day-Timer",
+      "category": "Category:Companies based in Lehigh County, Pennsylvania"
+    },
+    {
+      "company": "Thomas Iron Company",
+      "category": "Category:Companies based in Lehigh County, Pennsylvania"
+    },
+    {
+      "company": "Yocco's Hot Dogs",
+      "category": "Category:Companies based in Lehigh County, Pennsylvania"
+    },
+    {
+      "company": "Atlas Portland Cement Company",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "Chick'nCone",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "Crayola",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "Famous Smoke Shop",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "Follett Ice",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "IPVM",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "C. F. Martin & Company",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "OraSure Technologies",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "Service Electric",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "Sigma Guitars",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "Silly Putty",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "Victaulic",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "Weyerbacher Brewing Company",
+      "category": "Category:Companies based in Northampton County, Pennsylvania"
+    },
+    {
+      "company": "Agere Systems",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Arbogast & Bastian",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Bazzini",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Bethlehem Motor Truck Corporation",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Big-Bang Cannon",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Hess's",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "K Studios",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Kinemacolor Company of America",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Lehigh Structural Steel Company",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Lehigh Valley Transit Company",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Medstar Television",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "PPL Corporation",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Shift4",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Talen Energy",
+      "category": "Category:Companies based in Allentown, Pennsylvania"
+    },
+    {
+      "company": "Bethlehem Steel",
+      "category": "Category:Companies based in Bethlehem, Pennsylvania"
+    },
+    {
+      "company": "Guerber Engineering",
+      "category": "Category:Companies based in Bethlehem, Pennsylvania"
+    },
+    {
+      "company": "Just Born",
+      "category": "Category:Companies based in Bethlehem, Pennsylvania"
+    },
+    {
+      "company": "Stuffed Puffs",
+      "category": "Category:Companies based in Bethlehem, Pennsylvania"
+    },
+    {
+      "company": "Trans-Bridge Lines",
+      "category": "Category:Companies based in Bethlehem, Pennsylvania"
+    },
+    {
+      "company": "Vegan Treats Bakery",
+      "category": "Category:Companies based in Bethlehem, Pennsylvania"
+    },
+    {
+      "company": "Viddler",
+      "category": "Category:Companies based in Bethlehem, Pennsylvania"
+    },
+    {
+      "company": "WLEV-TV",
+      "category": "Category:Companies based in Bethlehem, Pennsylvania"
+    }
+  ]
+}

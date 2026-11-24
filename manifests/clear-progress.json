@@ -1,0 +1,28 @@
+{
+  "verified_count": 7137,
+  "target": 8854,
+  "ratio": "7137/8854",
+  "by_ats": {
+    "greenhouse": 4208,
+    "ashby": 2885,
+    "lever": 44
+  },
+  "parity_by_ats": {
+    "greenhouse": 5243,
+    "ashby": 3355,
+    "lever": 256
+  },
+  "checked": 9105,
+  "rate_per_s": 6.56,
+  "eta_remaining_queue_min": 0,
+  "eta_to_8854_at_this_rate_min": 4,
+  "rejected": {
+    "no_jobs": 673,
+    "not_found": 1297,
+    "company_missing": 25,
+    "company_mismatch": 29
+  },
+  "host_stops": [],
+  "backoff_cap_ms": 900000,
+  "updated_at": "2026-11-01T01:56:10.217Z"
+}

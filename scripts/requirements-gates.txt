@@ -1,0 +1,6 @@
+# Pinned for the ccp-checker gate. pydantic is pinned because semgrep 1.140.0
+# depends on mcp==1.16.0, and pip's newest pydantic 2.14.x drops eval_type_backport
+# which that mcp release imports. 2.11.9 satisfies mcp's pydantic>=2.11,<3.
+semgrep==1.140.0
+pydantic==2.11.9
+pydantic-core==2.33.2

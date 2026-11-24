@@ -1,0 +1,378 @@
+{
+    "$schema": "https://apify.com/schemas/v1/dataset.ide.json",
+    "actorSpecification": 1,
+    "fields": {
+        "type": "object",
+        "properties": {
+            "schema_version": {
+                "type": "string",
+                "title": "Schema version",
+                "description": "Output row schema version.",
+                "example": "1.0.0"
+            },
+            "type": {
+                "type": "string",
+                "title": "Row type",
+                "description": "job, board, company or error.",
+                "enum": ["job", "board", "company", "error"]
+            },
+            "source_url": {
+                "type": ["string", "null"],
+                "title": "Source URL",
+                "description": "Exact ATS API URL (or careers page) the row came from."
+            },
+            "checked_at": {
+                "type": "string",
+                "title": "Checked at",
+                "description": "ISO timestamp of this run's check."
+            },
+            "ats": {
+                "type": "string",
+                "title": "ATS",
+                "description": "greenhouse, lever, ashby, personio, pinpoint or gem."
+            },
+            "board": {
+                "type": "string",
+                "title": "Board slug"
+            },
+            "company": {
+                "type": ["string", "null"],
+                "title": "Company"
+            },
+            "company_domain": {
+                "type": ["string", "null"],
+                "title": "Company domain"
+            },
+            "job_id": {
+                "type": "string",
+                "title": "Job ID",
+                "description": "ATS job/posting id."
+            },
+            "job_key": {
+                "type": "string",
+                "title": "Job key",
+                "description": "ats:board:job_id (primary key)."
+            },
+            "title": {
+                "type": "string",
+                "title": "Title"
+            },
+            "department": {
+                "type": ["string", "null"],
+                "title": "Department"
+            },
+            "team": {
+                "type": ["string", "null"],
+                "title": "Team / function"
+            },
+            "locations": {
+                "type": "array",
+                "title": "Locations"
+            },
+            "countries": {
+                "type": "array",
+                "title": "Countries (ISO-2)"
+            },
+            "country_basis": {
+                "type": ["string", "null"],
+                "title": "Country basis",
+                "description": "ats (structured) or text (place-name list)."
+            },
+            "remote": {
+                "type": ["boolean", "null"],
+                "title": "Remote"
+            },
+            "remote_basis": {
+                "type": ["string", "null"],
+                "title": "Remote basis",
+                "description": "ats or text."
+            },
+            "workplace_type": {
+                "type": ["string", "null"],
+                "title": "Workplace type",
+                "description": "remote, hybrid or onsite."
+            },
+            "employment_type": {
+                "type": ["string", "null"],
+                "title": "Employment type"
+            },
+            "compensation": {
+                "type": ["object", "null"],
+                "title": "Compensation",
+                "description": "Only when the ATS publishes it: summary, min, max, currency, interval."
+            },
+            "posted_at": {
+                "type": ["string", "null"],
+                "title": "Posted at",
+                "description": "ATS publish/created timestamp; null if the ATS gives none (never guessed)."
+            },
+            "ats_updated_at": {
+                "type": ["string", "null"],
+                "title": "ATS updated at"
+            },
+            "apply_url": {
+                "type": ["string", "null"],
+                "title": "Apply URL"
+            },
+            "job_url": {
+                "type": ["string", "null"],
+                "title": "Job page URL"
+            },
+            "description_text": {
+                "type": ["string", "null"],
+                "title": "Description (text)"
+            },
+            "status": {
+                "type": "string",
+                "title": "Status",
+                "description": "open or closed."
+            },
+            "open_check": {
+                "type": "string",
+                "title": "Open check",
+                "description": "listed, detail_open, detail_closed, detail_not_supported, detail_failed or not_seen."
+            },
+            "verified_open_at": {
+                "type": ["string", "null"],
+                "title": "Verified open at",
+                "description": "When this run saw the job published by the employer's ATS."
+            },
+            "first_seen_at": {
+                "type": "string",
+                "title": "First seen at"
+            },
+            "last_seen_at": {
+                "type": "string",
+                "title": "Last seen at"
+            },
+            "age_days": {
+                "type": ["integer", "null"],
+                "title": "Age (days)"
+            },
+            "age_basis": {
+                "type": ["string", "null"],
+                "title": "Age basis",
+                "description": "posted_at or first_seen."
+            },
+            "long_open": {
+                "type": "boolean",
+                "title": "Long open"
+            },
+            "reposted": {
+                "type": ["boolean", "integer", "null"],
+                "title": "Reposted",
+                "description": "Job rows: boolean. Board rows: count of reposts detected, or null when trackChanges is off (not tracked)."
+            },
+            "stale_signal": {
+                "type": "string",
+                "title": "Stale signal",
+                "description": "none, long_open or reposted (heuristic)."
+            },
+            "repost_of": {
+                "type": ["string", "null"],
+                "title": "Repost of",
+                "description": "Earlier job_id with the same fingerprint that closed within 90 days."
+            },
+            "change": {
+                "type": ["string", "null"],
+                "title": "Change",
+                "description": "new, updated, unchanged or closed (null when history is off)."
+            },
+            "fingerprint": {
+                "type": "string",
+                "title": "Fingerprint",
+                "description": "sha1(company + normalized title + primary location), 16 hex chars."
+            },
+            "duplicate_group": {
+                "type": ["string", "null"],
+                "title": "Duplicate group"
+            },
+            "duplicate_of": {
+                "type": ["string", "null"],
+                "title": "Duplicate of",
+                "description": "job_key of the first row in this run with the same fingerprint."
+            },
+            "merged_job_ids": {
+                "type": "array",
+                "title": "Merged job IDs",
+                "description": "dedupe: role only."
+            },
+            "discovered_via": {
+                "type": ["string", "null"],
+                "title": "Discovered via"
+            },
+            "jobs_total": {
+                "type": "integer",
+                "title": "Jobs listed on board"
+            },
+            "jobs_matched": {
+                "type": "integer",
+                "title": "Jobs matching filters"
+            },
+            "jobs_emitted": {
+                "type": "integer",
+                "title": "Jobs emitted"
+            },
+            "complete": {
+                "type": "boolean",
+                "title": "Complete fetch"
+            },
+            "new": {
+                "type": ["integer", "null"],
+                "title": "New since last run"
+            },
+            "updated": {
+                "type": ["integer", "null"],
+                "title": "Updated since last run"
+            },
+            "closed": {
+                "type": ["integer", "null"],
+                "title": "Closed since last run"
+            },
+            "requests": {
+                "type": "integer",
+                "title": "API requests"
+            },
+            "input": {
+                "type": ["string", "null"],
+                "title": "Input"
+            },
+            "domain": {
+                "type": ["string", "null"],
+                "title": "Domain"
+            },
+            "boards": {
+                "type": "array",
+                "title": "Boards found"
+            },
+            "careers_pages_fetched": {
+                "type": "array",
+                "title": "Careers pages fetched"
+            },
+            "probes": {
+                "type": "integer",
+                "title": "API probes"
+            },
+            "cached": {
+                "type": "boolean",
+                "title": "From cache"
+            },
+            "code": {
+                "type": "string",
+                "title": "Error code",
+                "description": "Machine-readable error code."
+            },
+            "message": {
+                "type": "string",
+                "title": "Error message"
+            },
+            "retryable": {
+                "type": "boolean",
+                "title": "Retryable"
+            },
+            "host": {
+                "type": "string",
+                "title": "Host"
+            },
+            "context": {
+                "type": "object",
+                "title": "Error context"
+            }
+        },
+        "required": ["schema_version", "type", "checked_at"]
+    },
+    "views": {
+        "overview": {
+            "title": "Jobs overview",
+            "transformation": {
+                "fields": [
+                    "type",
+                    "company",
+                    "title",
+                    "locations",
+                    "remote",
+                    "posted_at",
+                    "age_days",
+                    "stale_signal",
+                    "change",
+                    "verified_open_at",
+                    "apply_url",
+                    "ats",
+                    "code",
+                    "message"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "type": {
+                        "label": "Row type"
+                    },
+                    "company": {
+                        "label": "Company"
+                    },
+                    "title": {
+                        "label": "Title"
+                    },
+                    "locations": {
+                        "label": "Locations"
+                    },
+                    "remote": {
+                        "label": "Remote"
+                    },
+                    "posted_at": {
+                        "label": "Posted at"
+                    },
+                    "age_days": {
+                        "label": "Age (days)"
+                    },
+                    "stale_signal": {
+                        "label": "Stale signal"
+                    },
+                    "change": {
+                        "label": "Change"
+                    },
+                    "verified_open_at": {
+                        "label": "Verified open at"
+                    },
+                    "apply_url": {
+                        "label": "Apply URL"
+                    },
+                    "ats": {
+                        "label": "ATS"
+                    },
+                    "code": {
+                        "label": "Error code"
+                    },
+                    "message": {
+                        "label": "Error message"
+                    }
+                }
+            }
+        },
+        "boards": {
+            "title": "Boards",
+            "transformation": {
+                "fields": [
+                    "type",
+                    "ats",
+                    "board",
+                    "company",
+                    "jobs_total",
+                    "jobs_matched",
+                    "jobs_emitted",
+                    "new",
+                    "updated",
+                    "closed",
+                    "reposted",
+                    "complete",
+                    "code",
+                    "message"
+                ]
+            },
+            "display": {
+                "component": "table"
+            }
+        }
+    }
+}

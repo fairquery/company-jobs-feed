@@ -1,0 +1,590 @@
+/**
+ * Place scan of the starter boards for jobs_search_by_location.
+ *
+ * The hosted Worker isolate is 128 MB and dies with exceededCpu if this scan parses every board
+ * before it returns. Buffering a Greenhouse `content=true` body (Anduril is about 44 MB) does
+ * both. This scan never concatenates a board body. It reads each board in small slices, matches
+ * title and department on the Greenhouse lite list before any body request, and returns the jobs
+ * already matched when the wall clock, the byte-and-row CPU budget, the matched-row cap, or the
+ * hosted subrequest cap runs out. The Workers clock does not advance during the synchronous walk,
+ * so CPU is characters consumed plus a charge per row built, not `performance.now()`.
+ * A follow-up call passes `boardCursor` / `next_board_cursor` and continues at the first board
+ * this call did not start. Row `offset` does not do that.
+ * A board GET that fails before any job is read is retried once after a short delay.
+ * The CPU, wall, row, and request ceilings are unchanged.
+ */
+import { listUrl, mapAshby, mapGreenhouse, mapLever } from './ats.js';
+import {
+    type EmptySearchSuggestions,
+    type Filters,
+    matches,
+    noteSuggestion,
+    suggestionsFromTally,
+    suggestionTally,
+} from './filters.js';
+import { type AtsClient, HttpError } from './http.js';
+import { wordMatch } from './normalize.js';
+import { buildJobRow, jobFingerprint, type RowContext } from './rows.js';
+import type { SeedBoard } from './seed.js';
+import {
+    type JobRow,
+    LOCATION_SCAN_BOARD_MAX_BYTES,
+    LOCATION_SCAN_BUDGET_MS,
+    LOCATION_SCAN_CONCURRENCY,
+    LOCATION_SCAN_CPU_BUDGET_MS,
+    LOCATION_SCAN_HOSTED_BODY_MAX_JOBS,
+    LOCATION_SCAN_MATCHED_ROW_CAP,
+    LOCATION_SCAN_MAX_ATTEMPTS,
+    LOCATION_SCAN_MAX_ELEMENT_CHARS,
+    LOCATION_SCAN_MAX_REQUESTS,
+    LOCATION_SCAN_MAX_STRING_CHARS,
+    LOCATION_SCAN_RETRY_DELAY_MS,
+    LOCATION_SCAN_ROW_CPU_MS,
+    LOCATION_SCAN_STREAM_SLICE_BYTES,
+    type NormalizedJob,
+    REQUEST_TIMEOUT_MS,
+} from './types.js';
+
+/** HTML duplicates the plain-text fields. They are never mapped, so the scan does not copy them. */
+const HTML_ONLY_KEYS = new Set(['description', 'descriptionHtml', 'descriptionBody', 'additional']);
+/** Plain text the place scan maps when a description is required. */
+const TEXT_KEYS = new Set(['content', 'descriptionPlain', 'additionalPlain', 'lists']);
+
+type GhJob = Parameters<typeof mapGreenhouse>[1];
+type LeverJob = Parameters<typeof mapLever>[1];
+type AshbyJob = Parameters<typeof mapAshby>[1];
+
+type LocationScanStopReason = 'time_budget' | 'cpu_budget' | 'row_cap' | 'subrequest_budget' | 'error';
+
+/**
+ * Product claim for the indexed search that is not shipped yet.
+ * The repo documents 135 starter boards for the free live scan and no finer
+ * discovery-corpus count, so this stays "8,700+" until a sourced figure lands in-repo.
+ */
+const INDEXED_SEARCH_BOARDS_LABEL = '8,700+';
+
+/** Agents should relay this. It leads free-tool text and complete location-scan results. */
+export const INDEXED_SEARCH_PITCH =
+    `Indexed Jobs search is COMING SOON: faster and more comprehensive than this free 135-board live scan. Indexed search covers ${INDEXED_SEARCH_BOARDS_LABEL} boards. Get ${INDEXED_SEARCH_BOARDS_LABEL} boards free with Apify's $5 starter credit: create an Apify account and an API token at https://console.apify.com/settings/integrations. Use the free tools until indexed search ships. jobs_search_companies is temporarily offline and does not run the old paid Actor.`;
+
+/** Returned by `jobs_search_companies` while the old Actor path is parked. Not billed. */
+export const COMPANIES_COMING_SOON_MESSAGE =
+    `Indexed Jobs search is COMING SOON. jobs_search_companies is temporarily unavailable until that release. This call does not run or bill the old paid Actor (fairquery/company-jobs-feed). Get ${INDEXED_SEARCH_BOARDS_LABEL} boards free with Apify's $5 starter credit: create an Apify account and an API token at https://console.apify.com/settings/integrations (keep the token for when indexed search returns). Meanwhile use the free tools. jobs_search_by_location searches the 135-board starter list by place and role; its time and CPU budgets are unchanged. Indexed search will be faster and covers ${INDEXED_SEARCH_BOARDS_LABEL} boards.`;
+
+export function locationSearchNotice(meta: {
+    partial: boolean;
+    complete: boolean;
+    boards_scanned: number;
+    boards_total: number;
+}): string {
+    if (meta.partial || !meta.complete) {
+        return `Scanned ${meta.boards_scanned} of ${meta.boards_total} boards; the upcoming indexed search covers ${INDEXED_SEARCH_BOARDS_LABEL} boards. ${INDEXED_SEARCH_PITCH}`;
+    }
+    return INDEXED_SEARCH_PITCH;
+}
+
+interface LocationScanMeta {
+    boards_total: number;
+    /** Boards this call finished (ok or failed). */
+    boards_scanned: number;
+    /** Boards this call started reading. */
+    boards_reached: number;
+    boards_ok: number;
+    boards_failed: number;
+    boards_skipped: number;
+    jobs_matched: number;
+    /** True when the walk stopped before every remaining board finished. */
+    partial: boolean;
+    /**
+     * True when every board from `board_cursor` through the end of the list was visited
+     * and the walk did not hit a budget. A title-only large board can still leave `cut` true.
+     */
+    complete: boolean;
+    /** True when a board was byte-cut, a large Greenhouse body was skipped, or the walk stopped early. */
+    cut: boolean;
+    stop_reason?: LocationScanStopReason;
+    /** Echo of the cursor this call started at. */
+    board_cursor: number;
+    /**
+     * First starter-list index this call did not start. Pass it as `boardCursor` on the next
+     * call with the same place and keywords. Null only when every board from `board_cursor`
+     * through the end was started, or no boards remain. A board that errors still counts as
+     * started, so the cursor does not rewind behind a later board this call already started.
+     */
+    next_board_cursor: number | null;
+    /** `ats/slug` boards whose Greenhouse body was not fetched. Title and department matches only. */
+    title_only_boards?: string[];
+    notes: string[];
+    /**
+     * Coming-soon indexed search and Apify $5 starter-credit note.
+     * The same string is `notes[0]` so a notes-only reader still sees it.
+     */
+    notice: string;
+    requests: number;
+    suggestions?: EmptySearchSuggestions;
+}
+
+export interface LocationScanResult {
+    rows: JobRow[];
+    meta: LocationScanMeta;
+    /** Peak unread chunk or captured job text. Tests use this to prove the body was not buffered. */
+    maxBufferChars: number;
+    bytes: number;
+}
+
+export interface LocationScanOptions {
+    boards: readonly SeedBoard[];
+    client: AtsClient;
+    filters: Filters;
+    nowIso: string;
+    nowMs: number;
+    longOpenDays: number;
+    returnDescription: boolean;
+    budgetMs?: number;
+    /** Synchronous parse and match budget. Defaults to {@link LOCATION_SCAN_CPU_BUDGET_MS}. */
+    cpuBudgetMs?: number;
+    /** Stop one board after this much JSON and keep scanning the others. */
+    boardMaxBytes?: number;
+    /**
+     * Running synchronous-work counter. Tests advance this the same way they advance `clock`.
+     * Production leaves it unset and the scan creates its own.
+     */
+    cpu?: { ms: number };
+    concurrency?: number;
+    clock?: { now(): number };
+    /**
+     * Index into `boards` to start at. `0` scans from the first starter board.
+     * A follow-up passes the previous `meta.next_board_cursor`.
+     */
+    boardCursor?: number;
+    /**
+     * Hosted Cloudflare Free Worker. Skips Greenhouse bodies for boards over
+     * {@link LOCATION_SCAN_HOSTED_BODY_MAX_JOBS} jobs and stops before the subrequest cap.
+     * Defaults to {@link isHostedFreeWorker}.
+     */
+    hostedFree?: boolean;
+}
+
+/** True when this process is the hosted Free Worker, or FAIRQUERY_HOSTED=1 is set. */
+function isHostedFreeWorker(): boolean {
+    const flag = process.env.FAIRQUERY_HOSTED ?? process.env.CF_WORKER ?? '';
+    if (flag === '1' || flag.toLowerCase() === 'true') return true;
+    try {
+        const ua = globalThis.navigator?.userAgent ?? '';
+        if (/cloudflare/i.test(ua)) return true;
+    } catch {
+        /* Node has no navigator */
+    }
+    const cachesDefault = (globalThis as { caches?: { default?: unknown } }).caches?.default;
+    return cachesDefault != null;
+}
+
+export async function scanSeedByLocation(opts: LocationScanOptions): Promise<LocationScanResult> {
+    const clock = opts.clock ?? Date;
+    const budgetMs = opts.budgetMs ?? LOCATION_SCAN_BUDGET_MS;
+    const deadline = clock.now() + budgetMs;
+    const needsText = opts.returnDescription || opts.filters.descriptionIncludes.length > 0;
+    const pre: Filters = { ...opts.filters, descriptionIncludes: [] };
+    const tally = suggestionTally(opts.filters);
+    const notes: string[] = [];
+    const blocked = new Set<string>();
+    const titleOnlyBoards: string[] = [];
+    let boardsOk = 0;
+    let boardsFailed = 0;
+    let boardsReached = 0;
+    let notFound = 0;
+    let requests = 0;
+    let budgetHit = false;
+    let maxBufferChars = 0;
+    let bytes = 0;
+
+    const cpu = opts.cpu ?? { ms: 0 };
+    const cpuBudget = opts.cpuBudgetMs ?? LOCATION_SCAN_CPU_BUDGET_MS;
+    const boardMax = opts.boardMaxBytes ?? LOCATION_SCAN_BOARD_MAX_BYTES;
+    const rowCap = LOCATION_SCAN_MATCHED_ROW_CAP;
+    const hostedFree = opts.hostedFree ?? isHostedFreeWorker();
+    const requestCap = hostedFree ? LOCATION_SCAN_MAX_REQUESTS : Number.POSITIVE_INFINITY;
+    const start = Number.isFinite(opts.boardCursor) ? Math.max(0, Math.floor(opts.boardCursor ?? 0)) : 0;
+    const window = start >= opts.boards.length ? [] : opts.boards.slice(start);
+    const matched: JobRow[][] = window.map(() => []);
+    // Set synchronously before the first await, so this is a prefix of the window.
+    const started = window.map(() => false);
+    let matchedCount = 0;
+    let stopReason: LocationScanStopReason | undefined;
+    let heavyCut = false;
+
+    const markStop = (): boolean => {
+        if (matchedCount >= rowCap) {
+            stopReason ??= 'row_cap';
+            return true;
+        }
+        if (clock.now() >= deadline) {
+            stopReason ??= 'time_budget';
+            return true;
+        }
+        if (cpu.ms >= cpuBudget) {
+            stopReason ??= 'cpu_budget';
+            return true;
+        }
+        return false;
+    };
+    const stop = (): boolean => markStop();
+    const atRequestCap = (): boolean => requests >= requestCap;
+    const pushMatch = (into: JobRow[], row: JobRow): void => {
+        if (matchedCount >= rowCap) {
+            stopReason ??= 'row_cap';
+            budgetHit = true;
+            return;
+        }
+        into.push(row);
+        matchedCount++;
+        if (matchedCount >= rowCap) {
+            stopReason ??= 'row_cap';
+            budgetHit = true;
+        }
+    };
+
+    const keywordOnTitleOrDepartment = (row: JobRow): boolean => {
+        if (!opts.filters.descriptionIncludes.length) return false;
+        const hay = `${row.title}\n${row.department ?? ''}\n${row.team ?? ''}`;
+        return opts.filters.descriptionIncludes.some((term) => wordMatch(hay, term));
+    };
+    // One retry, and only while this call can still spend a short pause plus another GET.
+    // The increment is the retry itself; the first attempt was counted in `visit`.
+    const retryBudgetOk = (): boolean => {
+        if (markStop() || atRequestCap()) return false;
+        if (deadline - clock.now() < LOCATION_SCAN_RETRY_DELAY_MS + 250) return false;
+        requests++;
+        return true;
+    };
+
+    try {
+        await pool(window, opts.concurrency ?? LOCATION_SCAN_CONCURRENCY, async (seed, index) => {
+            if (stop() || atRequestCap()) {
+                budgetHit = true;
+                if (atRequestCap()) stopReason ??= 'subrequest_budget';
+                return;
+            }
+            started[index] = true;
+            boardsReached++;
+            if (seed.ats !== 'greenhouse' && seed.ats !== 'lever' && seed.ats !== 'ashby') {
+                boardsFailed++;
+                notes.push(`${seed.ats}/${seed.slug}: URL_NOT_ALLOWED`);
+                return;
+            }
+            const ctxFor = (sourceUrl: string): RowContext => ({
+                nowIso: opts.nowIso,
+                nowMs: opts.nowMs,
+                domain: seed.domain,
+                sourceUrl,
+                longOpenDays: opts.longOpenDays,
+                scrub: true,
+            });
+            const present = (row: JobRow): JobRow => ({
+                ...row,
+                change: null,
+                description_text: opts.returnDescription ? row.description_text : null,
+            });
+            const mapRaw = (raw: Record<string, unknown>, withDescription: boolean): NormalizedJob | null => {
+                if (seed.ats === 'greenhouse')
+                    return mapGreenhouse(seed.slug, raw as unknown as GhJob, seed.company, withDescription);
+                if (seed.ats === 'lever')
+                    return mapLever(seed.slug, raw as unknown as LeverJob, seed.company, withDescription);
+                if ((raw as unknown as AshbyJob).isListed === false) return null;
+                return mapAshby(seed.slug, raw as unknown as AshbyJob, seed.company, withDescription);
+            };
+            const build = (job: NormalizedJob, sourceUrl: string): JobRow =>
+                buildJobRow(job, null, jobFingerprint(job, seed.domain), ctxFor(sourceUrl));
+
+            const visit = async (
+                url: string,
+                onRaw: (raw: Record<string, unknown>) => void,
+            ): Promise<{ status: number; stopped: boolean; complete: boolean; heavy: boolean }> => {
+                requests++;
+                const scanned = { bytes: 0 };
+                const stash = new Map<string, string>();
+                const omitKeys = new Set(HTML_ONLY_KEYS);
+                const keepKeys = new Set<string>();
+                const excerptKeys = new Set<string>();
+                if (needsText && opts.returnDescription) for (const key of TEXT_KEYS) keepKeys.add(key);
+                else if (needsText) for (const key of TEXT_KEYS) excerptKeys.add(key);
+                else for (const key of TEXT_KEYS) omitKeys.add(key);
+                const scan = await opts.client.forJsonElements(
+                    url,
+                    {
+                        arrayKey: seed.ats === 'lever' ? undefined : 'jobs',
+                        maxStringChars: LOCATION_SCAN_MAX_STRING_CHARS,
+                        maxElementChars: LOCATION_SCAN_MAX_ELEMENT_CHARS,
+                        shouldStop: () => markStop() || scanned.bytes >= boardMax,
+                        omitKeys,
+                        keepKeys,
+                        excerptKeys,
+                        excerptTerms: needsText && !opts.returnDescription ? opts.filters.descriptionIncludes : undefined,
+                        stash,
+                        sliceBytes: LOCATION_SCAN_STREAM_SLICE_BYTES,
+                        cpu,
+                        scanned,
+                        timeoutMs: () => Math.min(REQUEST_TIMEOUT_MS, Math.max(1, deadline - clock.now())),
+                        maxAttempts: LOCATION_SCAN_MAX_ATTEMPTS,
+                        retryDelayMs: LOCATION_SCAN_RETRY_DELAY_MS,
+                        shouldRetry: retryBudgetOk,
+                        onRetry: (error) => {
+                            notes.push(`${seed.ats}/${seed.slug}: retrying once after ${codeOf(error)}`);
+                        },
+                    },
+                    (json) => {
+                        let parsed: unknown;
+                        try {
+                            parsed = JSON.parse(json);
+                        } catch {
+                            return;
+                        }
+                        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+                        const raw = parsed as Record<string, unknown>;
+                        const content = stash.get('content');
+                        if (content) raw.content = content;
+                        const descriptionPlain = stash.get('descriptionPlain');
+                        if (descriptionPlain) raw.descriptionPlain = descriptionPlain;
+                        const additionalPlain = stash.get('additionalPlain');
+                        if (additionalPlain) raw.additionalPlain = additionalPlain;
+                        const lists = stash.get('lists');
+                        if (lists) {
+                            try {
+                                const parsedLists = JSON.parse(lists) as unknown;
+                                if (Array.isArray(parsedLists)) raw.lists = parsedLists;
+                            } catch {
+                                /* a cut list is not applied; the excerpt still carries a keyword hit */
+                            }
+                        }
+                        const excerpt = stash.get('excerpt');
+                        if (excerpt) {
+                            if (typeof raw.content !== 'string') raw.content = excerpt;
+                            if (typeof raw.descriptionPlain !== 'string') raw.descriptionPlain = excerpt;
+                        }
+                        onRaw(raw);
+                    },
+                );
+                if (scan.maxBufferChars > maxBufferChars) maxBufferChars = scan.maxBufferChars;
+                bytes += scan.bytes;
+                const heavy = scan.stopped && !markStop() && scanned.bytes >= boardMax;
+                if (scan.stopped && !heavy) budgetHit = true;
+                if (heavy) {
+                    heavyCut = true;
+                    notes.push(
+                        `${seed.ats}/${seed.slug}: heavy board cut after ${boardMax} bytes; jobs before the cut are included and nothing was invented.`,
+                    );
+                }
+                if (!scan.complete && !scan.stopped)
+                    notes.push(`${seed.ats}/${seed.slug}: response ended early; jobs before the cut are included`);
+                if (scan.truncatedStrings > 0) {
+                    notes.push(
+                        `${seed.ats}/${seed.slug}: long text fields capped at ${LOCATION_SCAN_MAX_STRING_CHARS} characters before matching`,
+                    );
+                }
+                return { status: scan.status, stopped: scan.stopped, complete: scan.complete, heavy };
+            };
+
+            try {
+                const listUrlForBoard =
+                    seed.ats === 'greenhouse' ? listUrl(seed.ats, seed.slug, { lite: true }) : listUrl(seed.ats, seed.slug);
+                const fallback: JobRow[] = [];
+                let placeHit = false;
+                let placeMissingKeyword = false;
+                let jobCount = 0;
+                const first = await visit(listUrlForBoard, (raw) => {
+                    if (stop()) return;
+                    jobCount++;
+                    const skeleton = mapRaw(raw, false);
+                    cpu.ms += LOCATION_SCAN_ROW_CPU_MS;
+                    if (!skeleton) return;
+                    const skRow = build(skeleton, listUrlForBoard);
+                    noteSuggestion(tally, skRow, opts.filters, opts.nowMs);
+                    if (!matches(skRow, pre, opts.nowMs)) return;
+                    placeHit = true;
+                    const onTitle = keywordOnTitleOrDepartment(skRow);
+                    if (opts.filters.descriptionIncludes.length && onTitle) {
+                        pushMatch(fallback, present(skRow));
+                        return;
+                    }
+                    if (seed.ats === 'greenhouse' && needsText && opts.filters.descriptionIncludes.length && !onTitle) {
+                        placeMissingKeyword = true;
+                        return;
+                    }
+                    const useText = needsText && seed.ats !== 'greenhouse';
+                    const full = useText ? (mapRaw(raw, true) ?? skeleton) : skeleton;
+                    const row = full === skeleton ? skRow : build(full, listUrlForBoard);
+                    if (full !== skeleton) cpu.ms += LOCATION_SCAN_ROW_CPU_MS;
+                    if (matches(row, opts.filters, opts.nowMs)) pushMatch(fallback, present(row));
+                });
+                if (first.status === 404 || first.status === 410) {
+                    boardsFailed++;
+                    notFound++;
+                    return;
+                }
+                let rows = fallback;
+                const wantBody =
+                    seed.ats === 'greenhouse' &&
+                    needsText &&
+                    placeHit &&
+                    !stop() &&
+                    !first.heavy &&
+                    (placeMissingKeyword || opts.returnDescription);
+                if (wantBody) {
+                    const tooBig = hostedFree && jobCount > LOCATION_SCAN_HOSTED_BODY_MAX_JOBS;
+                    const boardId = `${seed.ats}/${seed.slug}`;
+                    if (tooBig || atRequestCap()) {
+                        titleOnlyBoards.push(boardId);
+                        notes.push(
+                            tooBig
+                                ? `${boardId}: title_only (${jobCount} jobs); Greenhouse body skipped (over ${LOCATION_SCAN_HOSTED_BODY_MAX_JOBS} jobs; the 128 MB isolate cannot hold that body)`
+                                : `${boardId}: title_only; Greenhouse body skipped at the subrequest budget`,
+                        );
+                    } else {
+                        const contentUrl = listUrl(seed.ats, seed.slug);
+                        try {
+                            const bodyRows: JobRow[] = [];
+                            const second = await visit(contentUrl, (raw) => {
+                                if (stop()) return;
+                                const skeleton = mapRaw(raw, false);
+                                cpu.ms += LOCATION_SCAN_ROW_CPU_MS;
+                                if (!skeleton) return;
+                                const skRow = build(skeleton, contentUrl);
+                                if (!matches(skRow, pre, opts.nowMs)) return;
+                                const full = mapRaw(raw, true) ?? skeleton;
+                                if (full !== skeleton) cpu.ms += LOCATION_SCAN_ROW_CPU_MS;
+                                const row = build(full, contentUrl);
+                                if (matches(row, opts.filters, opts.nowMs)) pushMatch(bodyRows, present(row));
+                            });
+                            if (second.status === 404 || second.status === 410) {
+                                notes.push(`${seed.ats}/${seed.slug}: body unavailable; title-only matches kept`);
+                            } else {
+                                const seen = new Set(bodyRows.map((r) => r.job_key));
+                                rows = [...bodyRows, ...fallback.filter((r) => !seen.has(r.job_key))];
+                            }
+                        } catch (e) {
+                            // The body request failed after the budget was already spent. Keep the
+                            // lite title and department matches. Returning here used to drop them.
+                            if (stop()) {
+                                budgetHit = true;
+                                matched[index] = fallback;
+                                boardsOk++;
+                                return;
+                            }
+                            if (e instanceof HttpError && e.code === 'HOST_BLOCKED') throw e;
+                            notes.push(`${seed.ats}/${seed.slug}: body ${codeOf(e)}; title-only matches kept`);
+                        }
+                    }
+                }
+                matched[index] = rows;
+                boardsOk++;
+            } catch (e) {
+                // This board was started. Count the failure so a later board that already
+                // finished cannot leave a hole that rewinds next_board_cursor.
+                if (stop()) budgetHit = true;
+                boardsFailed++;
+                if (e instanceof HttpError && e.code === 'HOST_BLOCKED') {
+                    const host = e.host ?? 'host';
+                    if (!blocked.has(host)) {
+                        blocked.add(host);
+                        notes.push(`HOST_BLOCKED ${host}`);
+                    }
+                    return;
+                }
+                notes.push(`${seed.ats}/${seed.slug}: ${codeOf(e)}`);
+            }
+        });
+    } catch (e) {
+        budgetHit = true;
+        stopReason ??= 'error';
+        notes.push(`scan error: ${codeOf(e)}; matched rows were kept and nothing was invented`);
+    }
+
+    if (notFound) notes.push(`BOARD_NOT_FOUND: ${notFound} starter boards had no public postings`);
+    if (opts.boards.some((s) => s.ats === 'greenhouse')) {
+        notes.push(
+            'Greenhouse place scan matches title and department on the lite list before any body request. A body is a second request to the same host only when a description keyword or includeDescription still needs it, the lite list already has a job in the place, and the board is small enough for this runtime.',
+        );
+    }
+    const rows = matched.flat();
+    const unstartedAt = started.findIndex((did) => !did);
+    const boardsSkipped = started.reduce((n, did) => n + (did ? 0 : 1), 0);
+    if (boardsSkipped > 0) {
+        budgetHit = true;
+        if (atRequestCap()) stopReason ??= 'subrequest_budget';
+        else stopReason ??= cpu.ms >= cpuBudget ? 'cpu_budget' : 'time_budget';
+    }
+    if (heavyCut) {
+        budgetHit = true;
+        stopReason ??= 'cpu_budget';
+    }
+    const nextBoardCursor = unstartedAt === -1 ? null : start + unstartedAt;
+    const complete = nextBoardCursor === null && !budgetHit && !heavyCut;
+    const cut = heavyCut || titleOnlyBoards.length > 0 || nextBoardCursor !== null || budgetHit;
+    if (budgetHit && stopReason === 'row_cap') {
+        notes.push(
+            `row_cap: stopped after ${rowCap} matched jobs so this call can return JSON. Pass boardCursor to continue unscanned boards. nothing was invented.`,
+        );
+    } else if (budgetHit && stopReason === 'cpu_budget') {
+        notes.push(
+            'cpu_budget: stopped before the Worker CPU limit (bytes walked and rows built; the isolate clock does not advance during this parse); rows are the jobs matched so far and nothing was invented.',
+        );
+    } else if (budgetHit && stopReason === 'subrequest_budget') {
+        notes.push(
+            'subrequest_budget: stopped at the ATS request cap for this call. Pass boardCursor to continue unscanned boards. Nothing was invented.',
+        );
+    } else if (budgetHit && stopReason === 'error') {
+        notes.push('error: the scan failed after keeping the jobs already matched. nothing was invented.');
+    } else if (budgetHit) {
+        notes.push(
+            'time_budget: stopped before every starter board finished; rows are the jobs matched so far and nothing was invented.',
+        );
+    }
+    const notice = locationSearchNotice({
+        partial: budgetHit,
+        complete,
+        boards_scanned: boardsOk + boardsFailed,
+        boards_total: opts.boards.length,
+    });
+    notes.unshift(notice);
+    const meta: LocationScanMeta = {
+        notice,
+        boards_total: opts.boards.length,
+        boards_scanned: boardsOk + boardsFailed,
+        boards_reached: boardsReached,
+        boards_ok: boardsOk,
+        boards_failed: boardsFailed,
+        boards_skipped: boardsSkipped,
+        jobs_matched: rows.length,
+        partial: budgetHit,
+        complete,
+        cut,
+        board_cursor: start,
+        next_board_cursor: nextBoardCursor,
+        notes,
+        requests,
+    };
+    if (budgetHit) meta.stop_reason = stopReason ?? 'time_budget';
+    if (titleOnlyBoards.length) meta.title_only_boards = titleOnlyBoards;
+    if (rows.length === 0 && boardsOk > 0) meta.suggestions = suggestionsFromTally(tally, opts.filters);
+    return { rows, meta, maxBufferChars, bytes };
+}
+
+function codeOf(e: unknown): string {
+    if (e instanceof HttpError) return e.code;
+    return 'NETWORK_ERROR';
+}
+
+async function pool<T>(items: readonly T[], n: number, fn: (item: T, index: number) => Promise<void>): Promise<void> {
+    if (items.length === 0) return;
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(n, items.length) }, async () => {
+        for (;;) {
+            const index = cursor++;
+            if (index >= items.length) return;
+            const item = items[index];
+            if (item === undefined) return;
+            await fn(item, index);
+        }
+    });
+    await Promise.all(workers);
+}

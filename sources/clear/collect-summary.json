@@ -1,0 +1,15 @@
+{
+  "direct": 8610,
+  "by_ats": {
+    "ashby": 3261,
+    "greenhouse": 5309,
+    "lever": 40
+  },
+  "note": "Snapshot used for the 2026-11-01 verification. Includes the MIT directory, the free seed, Common Crawl CC-MAIN-2026-43 Greenhouse/Ashby URL slugs (job-boards pages 0,2,3,4 and retry of page 1; boards.greenhouse.io pages 0-1), and 25 Lever slugs from CC-MAIN-2026-39. Careers-page harvest of the wave-2 domains returned no board links.",
+  "target": 8854,
+  "parity_by_ats": {
+    "greenhouse": 5243,
+    "ashby": 3355,
+    "lever": 256
+  }
+}

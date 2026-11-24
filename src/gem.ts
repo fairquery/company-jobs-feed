@@ -1,0 +1,179 @@
+import { CareersFetcher, type HostGate, HttpError } from './http.js';
+import { decodeEntities } from './normalize.js';
+import { isGemApiHost, isGemJobPostsPath, isValidGemVanity, normHost } from './types.js';
+
+/**
+ * STATUS (Fairquery, 2026-10-26 ~7:50 PM EDT, via TM t757): ACCEPTED RISK.
+ * Policy lean was BLOCK in policy/drafts/jobs-ats-pinpoint-gem-2026-10-26.md:
+ * Gem's browsewrap Terms plus the AUP limit use to talent acquisition and bar
+ * "sales and commercial marketing". Fairquery overrode that lean and accepted the risk.
+ * Conditions kept in this file: named vanity paths only; GET
+ * https://api.gem.com/job_board/v0/{vanity}/job_posts/ only (departments and offices
+ * are inline on that response, so those endpoints are not called); never POST
+ * /applications; never a Gem API key or account; one shared lane at 1 request/second
+ * (well under the documented 20 rps key limit); job_url points at jobs.gem.com and
+ * the ad body is not copied into the row.
+ *
+ * api.gem.com/robots.txt answered HTTP 403 when Policy fetched it (unknown rules).
+ * This client does not request robots.txt: a 403 is the kill switch and would stop
+ * every named board before the documented GET.
+ */
+
+export interface GemPost {
+    id: string;
+    title: string;
+    department: string | null;
+    locations: string[];
+    locationType: string | null;
+    employmentType: string | null;
+    postedAt: string | null;
+    updatedAt: string | null;
+    absoluteUrl: string | null;
+}
+
+export interface GemIo {
+    get(url: string): Promise<{ status: number; body: string }>;
+}
+
+export function gemJobPostsUrl(vanity: string): string {
+    if (!isValidGemVanity(vanity)) {
+        throw new HttpError(
+            `Invalid Gem vanity "${vanity}". Pass the job-board path only (letters, digits, hyphens, underscores), e.g. gem:acme.`,
+            'INVALID_INPUT',
+            false,
+        );
+    }
+    return `https://api.gem.com/job_board/v0/${vanity.toLowerCase()}/job_posts/`;
+}
+
+/** Refuse every Gem URL that is not the documented job_posts list for one vanity. */
+export function assertGemFetchUrl(url: string): void {
+    let u: URL;
+    try {
+        u = new URL(url);
+    } catch {
+        throw new HttpError(`Refusing Gem URL ${url}`, 'URL_NOT_ALLOWED', false);
+    }
+    if (
+        u.protocol !== 'https:' ||
+        u.port ||
+        u.username ||
+        u.password ||
+        u.search ||
+        u.hash ||
+        !isGemApiHost(u.hostname) ||
+        !isGemJobPostsPath(u.pathname)
+    ) {
+        throw new HttpError(
+            `Refusing ${url}. Gem reads are only GET https://api.gem.com/job_board/v0/{vanity}/job_posts/. No API key, no applications, no other path.`,
+            'URL_NOT_ALLOWED',
+            false,
+        );
+    }
+}
+
+/** One named vanity. The host gate spaces every api.gem.com request. */
+export async function loadGemJobPosts(
+    vanity: string,
+    io: GemIo,
+): Promise<{ status: number; body: string; url: string; requests: number }> {
+    const url = gemJobPostsUrl(vanity);
+    assertGemFetchUrl(url);
+    const res = await io.get(url);
+    return { status: res.status, body: res.body, url, requests: 1 };
+}
+
+/**
+ * Production transport. GET only, DNS-pinned, no API key, job_posts list only.
+ * Redirects are not followed.
+ */
+export function gemClient(gate: HostGate): GemIo {
+    const careers = new CareersFetcher(gate);
+    return {
+        get: async (url: string) => {
+            assertGemFetchUrl(url);
+            const res = await careers.getGem(url);
+            return { status: res.status, body: res.body };
+        },
+    };
+}
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    return v as Record<string, unknown>;
+}
+
+function text(v: unknown): string | null {
+    if (typeof v === 'string') {
+        const t = v.trim();
+        return t || null;
+    }
+    return null;
+}
+
+/** Parse the documented job_posts array. Description fields are dropped and never returned. */
+export function parseGemJobPosts(body: string): GemPost[] {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(body);
+    } catch {
+        throw new Error('Gem job_posts was not JSON');
+    }
+    if (!Array.isArray(parsed)) throw new Error('Gem job_posts was not a JSON array');
+    const out: GemPost[] = [];
+    for (const item of parsed) {
+        const rec = asRecord(item);
+        if (!rec) continue;
+        const id = text(rec.id);
+        if (!id) continue;
+        const departments = Array.isArray(rec.departments) ? rec.departments : [];
+        const names = departments
+            .map((d) => text(asRecord(d)?.name))
+            .filter((n): n is string => !!n)
+            .map((n) => decodeEntities(n));
+        const offices = Array.isArray(rec.offices) ? rec.offices : [];
+        const locations: string[] = [];
+        const primary = text(asRecord(rec.location)?.name);
+        if (primary) locations.push(decodeEntities(primary));
+        for (const office of offices) {
+            const o = asRecord(office);
+            const label = text(asRecord(o?.location)?.name) ?? text(o?.name);
+            const decoded = label ? decodeEntities(label) : null;
+            if (decoded && !locations.includes(decoded)) locations.push(decoded);
+        }
+        out.push({
+            id,
+            title: decodeEntities(text(rec.title) ?? ''),
+            department: names.length ? names.join(', ') : null,
+            locations,
+            locationType: text(rec.location_type),
+            employmentType: text(rec.employment_type),
+            postedAt: text(rec.first_published_at),
+            updatedAt: text(rec.updated_at),
+            absoluteUrl: text(rec.absolute_url),
+        });
+    }
+    return out;
+}
+
+/**
+ * Public jobs.gem.com link for the row. Off-host URLs and apply paths are not used.
+ * Falls back to the documented https://jobs.gem.com/{vanity}/{id} shape. Never fetched.
+ */
+export function gemPublicJobUrl(vanity: string, absoluteUrl: string | null, id: string): string | null {
+    const safeId = /^[A-Za-z0-9_-]{1,200}$/.test(id) ? id : null;
+    const fallback = safeId ? `https://jobs.gem.com/${vanity.toLowerCase()}/${safeId}` : null;
+    if (!absoluteUrl) return fallback;
+    let u: URL;
+    try {
+        u = new URL(absoluteUrl);
+    } catch {
+        return fallback;
+    }
+    if (u.protocol !== 'https:' || u.username || u.password || u.port) return fallback;
+    if (normHost(u.hostname) !== 'jobs.gem.com') return fallback;
+    const parts = u.pathname.split('/').filter(Boolean);
+    if (parts[0]?.toLowerCase() !== vanity.toLowerCase()) return fallback;
+    if (parts.some((p) => /apply|application/i.test(p))) return fallback;
+    return `https://jobs.gem.com/${parts.map((p) => encodeURIComponent(p)).join('/')}`;
+}

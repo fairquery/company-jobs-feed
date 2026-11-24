@@ -1,0 +1,19 @@
+{
+  "name": "fairquery-company-jobs-feed",
+  "version": "1.1.19",
+  "description": "COMING SOON: indexed Jobs search (faster, 8,700+ boards). Get 8,700+ boards free with Apify's $5 starter credit. Free local Greenhouse, Lever and Ashby tools (135-board starter list). jobs_search_companies is temporarily offline.",
+  "mcpServers": {
+    "fairquery-jobs-feed": {
+      "command": "npx",
+      "args": ["-y", "@fairquery/company-jobs-feed-mcp@1.1.19"]
+    }
+  },
+  "settings": [
+    {
+      "name": "Apify API token (optional)",
+      "description": "For when indexed Jobs search returns. jobs_search_companies is temporarily offline and does not bill your Apify account. Create a token at https://console.apify.com/settings/integrations. Get 8,700+ boards free with Apify's $5 starter credit. Leave empty to use the free tools (135 starter boards).",
+      "envVar": "APIFY_TOKEN",
+      "sensitive": true
+    }
+  ]
+}

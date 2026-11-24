@@ -1,0 +1,288 @@
+import { CareersFetcher, type HostGate, HttpError } from './http.js';
+import { decodeEntities, scrubPII } from './normalize.js';
+import { crawlDelayMs, isAllowed, type Robots } from './robots.js';
+import {
+    type Compensation,
+    isPinpointPostingsPath,
+    isPinpointTenantHost,
+    isValidPinpointSubdomain,
+    PINPOINT_CRAWL_DELAY_CAP_MS,
+    PINPOINT_MIN_INTERVAL_MS,
+    pinpointSubdomainFromHost,
+    ROBOTS_AGENT,
+} from './types.js';
+
+/**
+ * Pinpoint public job postings feed.
+ * The only job URL we build is GET https://{subdomain}.pinpointhq.com/postings.json
+ * (Pinpoint Job Postings JSON Endpoint). The deprecated jobs.json feed is not requested.
+ * Locale paths, filter query parameters, /api/v1 and apply URLs are not requested.
+ * robots.txt on that same origin is fetched first and cached for the run.
+ * Subdomains come from the caller. This module does not enumerate *.pinpointhq.com.
+ * Scope is public career-page listings only. This code is not a Pinpoint customer
+ * and never logs in to the Service.
+ *
+ * STATUS (2026-10-26 ~8:00 PM ET): CLEAR-with-conditions after an AUP PDF skim.
+ * Unlocked for Origin and a later Apify publish. This process does not publish.
+ * [LAWYER] AUP preamble and §7 may reach non-customers. That is a note, not a hold.
+ * The ad body, reporting_to, and any email or phone in metadata are not stored.
+ * job_url is the public listing link. Policy: policy/drafts/jobs-ats-pinpoint-gem-2026-10-26.md.
+ * On ship, the privacy/security pages need Pinpoint added to the jobs-feed source list.
+ * Do not edit getfairquery-site in the adapter PR.
+ */
+
+export interface PinpointCompensationInput {
+    /** null when the feed omits compensation_visible. false drops every pay field. */
+    visible: boolean | null;
+    summary: string | null;
+    min: number | null;
+    max: number | null;
+    currency: string | null;
+    frequency: string | null;
+}
+
+export interface PinpointPosting {
+    id: string;
+    title: string;
+    department: string | null;
+    team: string | null;
+    locationName: string | null;
+    employmentType: string | null;
+    employmentTypeText: string | null;
+    workplaceType: string | null;
+    compensation: PinpointCompensationInput | null;
+    /** Raw url field. The mapper keeps it only when it is this tenant's public listing. */
+    listingUrl: string | null;
+}
+
+export interface PinpointIo {
+    robots(url: string): Promise<Robots>;
+    get(url: string): Promise<{ status: number; body: string }>;
+}
+
+const FREQUENCIES = new Set(['hour', 'day', 'week', 'two_weeks', 'month', 'year']);
+
+export function pinpointPostingsUrl(subdomain: string): string {
+    return pinpointOriginUrl(subdomain, '/postings.json');
+}
+
+function pinpointRobotsUrl(subdomain: string): string {
+    return pinpointOriginUrl(subdomain, '/robots.txt');
+}
+
+function pinpointOriginUrl(subdomain: string, path: '/postings.json' | '/robots.txt'): string {
+    if (!isValidPinpointSubdomain(subdomain)) {
+        throw new HttpError(
+            `Invalid Pinpoint subdomain "${subdomain}". Pass the company label only (letters, digits, hyphens), e.g. pinpoint:acme.`,
+            'INVALID_INPUT',
+            false,
+        );
+    }
+    return `https://${subdomain.toLowerCase()}.pinpointhq.com${path}`;
+}
+
+/** Refuse anything that is not /postings.json or that host's /robots.txt. */
+export function assertPinpointFetchUrl(url: string, path: '/postings.json' | '/robots.txt'): void {
+    let u: URL;
+    try {
+        u = new URL(url);
+    } catch {
+        throw new HttpError(`Refusing Pinpoint URL ${url}`, 'URL_NOT_ALLOWED', false);
+    }
+    const got = u.pathname.replace(/\/+$/, '') || '/';
+    const hostOk = path === '/postings.json' ? isPinpointPostingsPath(u.pathname) : got === '/robots.txt';
+    if (
+        u.protocol !== 'https:' ||
+        u.port ||
+        u.username ||
+        u.password ||
+        u.search ||
+        u.hash ||
+        !isPinpointTenantHost(u.hostname) ||
+        !hostOk ||
+        got !== path
+    ) {
+        throw new HttpError(
+            `Refusing ${url}. Pinpoint reads are only https://{subdomain}.pinpointhq.com/postings.json and that host's robots.txt.`,
+            'URL_NOT_ALLOWED',
+            false,
+        );
+    }
+}
+
+const sleep = async (ms: number) =>
+    new Promise<void>((r) => {
+        setTimeout(r, ms);
+    });
+
+/**
+ * Fetch one named subdomain's feed: robots.txt, then /postings.json if allowed.
+ * `io.get` is not called when robots.txt disallows /postings.json or cannot be read.
+ */
+export async function loadPinpointPostings(
+    subdomain: string,
+    io: PinpointIo,
+    sleepFn: (ms: number) => Promise<void> = sleep,
+): Promise<{ status: number; body: string; url: string; requests: number }> {
+    const url = pinpointPostingsUrl(subdomain);
+    const robotsUrl = pinpointRobotsUrl(subdomain);
+    assertPinpointFetchUrl(robotsUrl, '/robots.txt');
+    assertPinpointFetchUrl(url, '/postings.json');
+    const robots = await io.robots(robotsUrl);
+    const host = new URL(url).hostname;
+    if (!isAllowed(robots, ROBOTS_AGENT, '/postings.json')) {
+        throw new HttpError(
+            `robots.txt on ${host} disallows /postings.json`,
+            'ROBOTS_DISALLOWED',
+            false,
+            undefined,
+            host,
+        );
+    }
+    const delay = Math.min(PINPOINT_CRAWL_DELAY_CAP_MS, crawlDelayMs(robots, ROBOTS_AGENT));
+    if (delay > PINPOINT_MIN_INTERVAL_MS) await sleepFn(delay - PINPOINT_MIN_INTERVAL_MS);
+    const res = await io.get(url);
+    return { status: res.status, body: res.body, url, requests: 2 };
+}
+
+/** Production transport. GET only, DNS-pinned, robots-checked, /postings.json and /robots.txt only. */
+export function pinpointClient(gate: HostGate): PinpointIo {
+    const careers = new CareersFetcher(gate);
+    return {
+        robots: async (url: string) => {
+            assertPinpointFetchUrl(url, '/robots.txt');
+            return careers.robotsDocument(new URL(url));
+        },
+        get: async (url: string) => {
+            assertPinpointFetchUrl(url, '/postings.json');
+            const res = await careers.getPinpoint(url);
+            return { status: res.status, body: res.body };
+        },
+    };
+}
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    return v as Record<string, unknown>;
+}
+
+function text(v: unknown): string | null {
+    if (typeof v === 'string') {
+        const t = v.trim();
+        return t || null;
+    }
+    if (typeof v === 'number' && Number.isFinite(v)) return String(v);
+    return null;
+}
+
+function named(v: unknown): string | null {
+    const rec = asRecord(v);
+    if (rec) return text(rec.name);
+    return text(v);
+}
+
+function finite(v: unknown): number | null {
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string' && v.trim()) {
+        const n = Number(v.replace(/,/g, ''));
+        return Number.isFinite(n) ? n : null;
+    }
+    return null;
+}
+
+/** Drop emails and phones. The contact itself is not kept, including as a redaction marker. */
+function publicText(v: unknown): string | null {
+    const raw = text(v);
+    if (!raw) return null;
+    const stripped = scrubPII(decodeEntities(raw))
+        .text.replace(/\[(?:email|phone) removed\]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return stripped || null;
+}
+
+/**
+ * Parse the documented `{ data: [...] }` postings feed. jobs.json is not a separate code path.
+ * Description HTML, responsibilities, skills, benefits and reporting_to are not copied.
+ */
+export function parsePinpointPostings(body: string): PinpointPosting[] {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(body);
+    } catch {
+        throw new Error('Pinpoint postings.json was not JSON');
+    }
+    const root = asRecord(parsed);
+    const data = root?.data;
+    if (!root || !Array.isArray(data)) throw new Error('Pinpoint postings.json has no data array');
+    const out: PinpointPosting[] = [];
+    for (const item of data) {
+        const rec = asRecord(item);
+        if (!rec) continue;
+        const id = text(rec.id);
+        if (!id) continue;
+        const job = asRecord(rec.job);
+        out.push({
+            id,
+            title: publicText(rec.title) ?? '',
+            department: publicText((job && named(job.department)) ?? named(rec.department)),
+            team: publicText(
+                (job && (named(job.division) ?? named(job.structure_custom_group_one))) ??
+                    named(rec.division) ??
+                    named(rec.structure_custom_group_one),
+            ),
+            locationName: publicText(named(rec.location)),
+            employmentType: text(rec.employment_type),
+            employmentTypeText: publicText(rec.employment_type_text),
+            workplaceType: text(rec.workplace_type),
+            compensation: compensationInput(rec),
+            listingUrl: text(rec.url),
+        });
+    }
+    return out;
+}
+
+function compensationInput(rec: Record<string, unknown>): PinpointCompensationInput | null {
+    const visible = typeof rec.compensation_visible === 'boolean' ? rec.compensation_visible : null;
+    const summary = publicText(rec.compensation);
+    const min = finite(rec.compensation_minimum);
+    const max = finite(rec.compensation_maximum);
+    const currency = text(rec.compensation_currency);
+    const frequency = text(rec.compensation_frequency);
+    if (visible === null && min == null && max == null && !summary && !currency && !frequency) return null;
+    return { visible, summary, min, max, currency, frequency };
+}
+
+/**
+ * Public listing URL on the same tenant only. Apply paths and other hosts are dropped.
+ * The caller does not fetch this URL.
+ */
+export function pinpointListingUrl(subdomain: string, raw: string | null): string | null {
+    if (!raw || !isValidPinpointSubdomain(subdomain)) return null;
+    let u: URL;
+    try {
+        u = new URL(raw);
+    } catch {
+        return null;
+    }
+    if (u.protocol !== 'https:' || u.username || u.password || u.port) return null;
+    if (pinpointSubdomainFromHost(u.hostname) !== subdomain.toLowerCase()) return null;
+    if (u.pathname.split('/').some((p) => /apply|application|api/i.test(p))) return null;
+    if (/\.json$/i.test(u.pathname)) return null;
+    const parts = u.pathname.split('/').filter(Boolean);
+    if (!parts.length) return null;
+    return `https://${subdomain.toLowerCase()}.pinpointhq.com/${parts.map((p) => encodeURIComponent(p)).join('/')}`;
+}
+
+/** Map documented compensation fields. Null when compensation_visible is false or nothing is published. */
+export function compensationFromPinpoint(fields: PinpointCompensationInput | null): Compensation | null {
+    if (!fields || fields.visible === false) return null;
+    const { summary } = fields;
+    let { min, max } = fields;
+    if (min != null && max != null && min > max) [min, max] = [max, min];
+    const currency = fields.currency && /^[A-Za-z]{3}$/.test(fields.currency) ? fields.currency.toUpperCase() : null;
+    const freq = fields.frequency?.trim().toLowerCase() ?? null;
+    const interval = freq && FREQUENCIES.has(freq) ? freq : null;
+    if (min == null && max == null && !summary) return null;
+    return { summary, min, max, currency, interval };
+}

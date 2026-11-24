@@ -1,0 +1,138 @@
+# Local Cppcheck-class defect rules for the Fairquery mechanical gate `ccp-checker`.
+# Semgrep OSS registry packs (p/typescript, p/javascript) withhold most rules until
+# a Semgrep App login. These rules stay in-repo so the gate does not depend on a SaaS review bot.
+# Severity ERROR is blocking: `semgrep scan --error` exits non-zero on any match.
+rules:
+  - id: dynamic-code-exec
+    languages: [typescript]
+    severity: ERROR
+    message: Dynamic code execution (eval, Function, or the vm module) is a defect. Do not execute strings as code.
+    metadata:
+      category: security
+      cwe: "CWE-95"
+      gate-class: cppcheck
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+      - pattern: Function(...)
+      - pattern: vm.runInThisContext(...)
+      - pattern: vm.runInNewContext(...)
+      - pattern: vm.compileFunction(...)
+      - pattern: setTimeout("...", ...)
+      - pattern: setInterval("...", ...)
+      - pattern: setTimeout(`...`, ...)
+      - pattern: setInterval(`...`, ...)
+
+  - id: child-process-exec
+    languages: [typescript]
+    severity: ERROR
+    message: child_process shell execution can run injected commands. This Actor does not shell out.
+    metadata:
+      category: security
+      cwe: "CWE-78"
+      gate-class: cppcheck
+    pattern-either:
+      - pattern: child_process.exec(...)
+      - pattern: child_process.execSync(...)
+      - pattern: child_process.spawn(...)
+      - pattern: child_process.execFile(...)
+      - pattern: child_process.execFileSync(...)
+      - pattern: |
+          import { $NAME } from "node:child_process"
+          ...
+          $NAME(...)
+      - pattern: |
+          import { $NAME } from "child_process"
+          ...
+          $NAME(...)
+      - pattern: |
+          import $NS from "node:child_process"
+          ...
+          $NS.$M(...)
+      - pattern: |
+          import $NS from "child_process"
+          ...
+          $NS.$M(...)
+
+  - id: tls-verification-disabled
+    languages: [typescript]
+    severity: ERROR
+    message: TLS certificate verification is disabled. Refusing to ship that defect.
+    metadata:
+      category: security
+      cwe: "CWE-295"
+      gate-class: cppcheck
+    pattern-either:
+      - pattern: "{ rejectUnauthorized: false }"
+      - pattern: "rejectUnauthorized: false"
+      - pattern: "process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'"
+      - pattern: 'process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"'
+      - pattern: "process.env.NODE_TLS_REJECT_UNAUTHORIZED = `0`"
+
+  - id: prototype-pollution-assignment
+    languages: [typescript]
+    severity: ERROR
+    message: Assignment to __proto__ or constructor.prototype is a prototype-pollution defect.
+    metadata:
+      category: security
+      cwe: "CWE-1321"
+      gate-class: cppcheck
+    pattern-either:
+      - pattern: $OBJ.__proto__ = $VAL
+      - pattern: $OBJ["__proto__"] = $VAL
+      - pattern: $OBJ['__proto__'] = $VAL
+      - pattern: $OBJ["constructor"]["prototype"] = $VAL
+      - pattern: $OBJ['constructor']['prototype'] = $VAL
+
+  - id: debugger-statement
+    languages: [typescript]
+    severity: ERROR
+    message: A debugger statement left in source will halt a runtime that is listening for a debugger.
+    metadata:
+      category: correctness
+      gate-class: cppcheck
+    pattern: debugger
+
+  - id: deprecated-buffer-ctor
+    languages: [typescript]
+    severity: ERROR
+    message: new Buffer() is deprecated and can expose uninitialized memory. Use Buffer.from or Buffer.alloc.
+    metadata:
+      category: correctness
+      cwe: "CWE-14"
+      gate-class: cppcheck
+    pattern-either:
+      - pattern: new Buffer(...)
+      - pattern: Buffer(...)
+
+  - id: dom-xss-sink
+    languages: [typescript]
+    severity: ERROR
+    message: Writing HTML from data into the DOM is a cross-site scripting sink.
+    metadata:
+      category: security
+      cwe: "CWE-79"
+      gate-class: cppcheck
+    pattern-either:
+      - pattern: $EL.innerHTML = $VAL
+      - pattern: $EL.outerHTML = $VAL
+      - pattern: document.write(...)
+      - pattern: document.writeln(...)
+
+  - id: identical-if-else
+    languages: [typescript]
+    severity: ERROR
+    message: Both branches of this if statement are identical, so the condition has no effect.
+    metadata:
+      category: correctness
+      gate-class: cppcheck
+    pattern-either:
+      - pattern: |
+          if ($COND) {
+            $...BODY
+          } else {
+            $...BODY
+          }
+      - pattern: |
+          if ($COND) $STMT;
+          else $STMT;

@@ -1,0 +1,30 @@
+{
+    "$schema": "https://apify.com/schemas/v1/actor.ide.json",
+    "actorSpecification": 1,
+    "name": "company-jobs-feed",
+    "title": "Company Jobs Feed: Greenhouse, Lever, Ashby, Personio, Pinpoint & Gem",
+    "description": "Live, open jobs straight from companies' own hiring systems via official public ATS APIs, the documented Personio XML feed, the documented Pinpoint postings.json feed, and a named Gem job board (no login, no proxies, no public jobs directory). Every row says when we verified it open, its age and repost signals. Filters, change tracking, de-dup. $0.99 per 1,000 jobs.",
+    "version": "1.0",
+    "buildTag": "latest",
+    "meta": {
+        "templateId": "ts-empty",
+        "generatedBy": "Cursor with Grok 4.7"
+    },
+    "defaultRunOptions": {
+        "build": "latest",
+        "memoryMbytes": 256,
+        "timeoutSecs": 900
+    },
+    "minMemoryMbytes": 128,
+    "maxMemoryMbytes": 512,
+    "input": "./input_schema.json",
+    "inputSchema": "./input_schema.json",
+    "output": "./output_schema.json",
+    "outputSchema": "./output_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json",
+        "keyValueStore": "./key_value_store_schema.json"
+    },
+    "dockerfile": "./Dockerfile",
+    "readme": "./README.md"
+}
